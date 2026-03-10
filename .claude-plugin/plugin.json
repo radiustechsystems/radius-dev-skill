@@ -1,0 +1,26 @@
+{
+    "name": "radius-dev",
+    "description": "End-to-end Radius Network development playbook. Stablecoin-native EVM with sub-second finality for extremely demanding applications. Covers TypeScript integration (plain viem), wallet integration (wagmi), smart contracts (Foundry), micropayments, x402 protocol integration, production gotchas, and EVM divergence from Ethereum.",
+    "version": "0.0.1",
+    "author": {
+        "name": "Radius Technology Systems"
+    },
+    "homepage": "https://docs.radiustech.xyz/",
+    "repository": "https://github.com/radiustechnologysystems/radius-dev-skill",
+    "license": "MIT",
+    "keywords": [
+        "radius",
+        "evm",
+        "stablecoin",
+        "blockchain",
+        "web3",
+        "smart-contracts",
+        "micropayments",
+        "x402",
+        "viem",
+        "wagmi",
+        "foundry",
+        "agent-payments",
+        "settlement"
+    ]
+}
