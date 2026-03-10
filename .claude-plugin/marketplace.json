@@ -11,7 +11,7 @@
     "plugins": [
         {
             "name": "radius-dev",
-            "source": ".",
+            "source": "./",
             "description": "End-to-end Radius Network development playbook. Stablecoin-native EVM with sub-second finality for extremely demanding applications. Covers TypeScript integration (plain viem), wallet integration (wagmi), smart contracts (Foundry), micropayments, x402 protocol integration, production gotchas, and EVM divergence from Ethereum.",
             "version": "0.0.1",
             "author": {
