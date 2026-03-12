@@ -25,88 +25,137 @@ Radius solves this with **pay-per-visit micropayments** — users pay exactly fo
 
 ### How it works
 
-1. **User lands on premium content** and sees a paywall
-2. **Clicks "Unlock" and chooses a micropayment amount** (0.05 USD, 0.10 USD, 0.25 USD, etc.)
-3. **Confirms payment in their wallet** (MetaMask, Rainbow, etc.)
-4. **Content unlocks instantly** after payment confirmation — no waiting, no email verification
-5. **Payment settles instantly** to your account in stablecoins
+1. **User lands on premium content** and sees a paywall with the price
+2. **Clicks "Unlock"** and confirms a micropayment in their wallet (MetaMask, etc.)
+3. **Client sends the transaction hash to your server** for verification
+4. **Server verifies the payment on-chain** (checks status, amount, and recipient)
+5. **Server records the payment and returns the premium content** — content is never sent to the client until payment is verified
+6. **On repeat visits**, the server checks existing payment records and serves content immediately
 
 Radius handles the heavy lifting: gas fees are paid in stablecoins via Turnstile, transactions settle in seconds, and there's no intermediary taking a cut.
 
+> **⚠️ Security:** Premium content must be delivered by the server only after payment verification. Never gate content client-side with a boolean flag — it can be trivially bypassed via browser devtools. See [security.md](security.md): *"Payment verification happens server-side, not client-side."*
+
 ### Implementation: Paywall component
 
+The paywall component does **not** receive premium content as `children`. Content lives on your server and is delivered only after payment is verified server-side.
+
 ```typescript
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { parseEther } from 'viem';
-import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { useAccount, useSendTransaction, useWaitForTransactionReceipt } from 'wagmi';
 
 interface ContentPaywallProps {
   contentId: string;
   title: string;
   amount: string; // e.g., "0.10" (USD)
-  children: React.ReactNode;
+  contentOwner: string; // Payment recipient address
+  preview?: React.ReactNode; // Optional teaser (safe to show before payment)
 }
 
 export function ContentPaywall({
   contentId,
   title,
   amount,
-  children,
+  contentOwner,
+  preview,
 }: ContentPaywallProps) {
   const { address, isConnected } = useAccount();
-  const [isUnlocked, setIsUnlocked] = useState(false);
+  const [unlockedContent, setUnlockedContent] = useState<string | null>(null);
   const [isPaying, setIsPaying] = useState(false);
-  const { data: hash, writeContract, isPending } = useWriteContract();
+  const [error, setError] = useState<string | null>(null);
+  const { data: hash, sendTransaction, isPending } = useSendTransaction();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
     hash,
   });
 
+  // On mount: check if this user already paid (repeat visit)
+  useEffect(() => {
+    if (!address) return;
+    fetch(`/api/content/${contentId}/access?address=${address}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.content) setUnlockedContent(data.content);
+      })
+      .catch(() => {}); // No existing access — show paywall
+  }, [address, contentId]);
+
+  // After payment confirms on-chain, verify server-side and fetch content
+  useEffect(() => {
+    if (!isSuccess || !hash || !address || unlockedContent) return;
+
+    fetch('/api/content/verify-payment', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        transactionHash: hash,
+        contentId,
+        userAddress: address,
+      }),
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error('Payment verification failed');
+        return res.json();
+      })
+      .then((data) => {
+        if (data.content) {
+          setUnlockedContent(data.content);
+        } else {
+          setError('Payment verified but content unavailable');
+        }
+        setIsPaying(false);
+      })
+      .catch((err) => {
+        setError(err.message);
+        setIsPaying(false);
+      });
+  }, [isSuccess, hash, address, contentId, unlockedContent]);
+
   const handleUnlock = async () => {
     if (!address) return;
-
     setIsPaying(true);
+    setError(null);
 
     try {
-      const contentOwner = '0x742d35Cc6634C0532925a3b844Bc9e7595f7E9F1';
-
-      writeContract({
-        to: contentOwner,
-        account: address,
+      sendTransaction({
+        to: contentOwner as `0x${string}`,
         value: parseEther(amount),
       });
-    } catch (error) {
-      console.error('Payment failed:', error);
+    } catch (err) {
+      console.error('Payment failed:', err);
       setIsPaying(false);
     }
   };
-
-  // Once payment is confirmed, unlock content
-  if (isSuccess && !isUnlocked) {
-    setIsUnlocked(true);
-    setIsPaying(false);
-  }
 
   if (!isConnected) {
     return (
       <div className="paywall">
         <h2>{title}</h2>
         <p>Connect your wallet to unlock this content.</p>
-        <button onClick={() => {}}>Connect Wallet</button>
       </div>
     );
   }
 
-  if (isUnlocked) {
-    return <div className="content">{children}</div>;
+  // Content delivered by the server after verification — safe to render
+  if (unlockedContent) {
+    return (
+      <div className="content">
+        <h2>{title}</h2>
+        <div>{unlockedContent}</div>
+      </div>
+    );
   }
 
   return (
     <div className="paywall">
       <h2>{title}</h2>
+      {preview && <div className="preview">{preview}</div>}
       <p>
         This premium content costs <strong>{amount} USD</strong> to unlock.
       </p>
       <p>One-time payment. No subscription. Instant access.</p>
+
+      {error && <p className="error">{error}</p>}
 
       <button
         onClick={handleUnlock}
@@ -137,22 +186,20 @@ export default function ArticlePage() {
       contentId="article-123"
       title="The Future of Micropayments"
       amount="0.10"
-    >
-      <article>
-        <p>
-          Micropayments enable creators to monetize directly. Instead of
-          relying on ads or subscriptions, users pay exactly what content is
-          worth to them...
-        </p>
-      </article>
-    </ContentPaywall>
+      contentOwner="0x742d35Cc6634C0532925a3b844Bc9e7595f7E9F1"
+      preview={<p>Micropayments enable creators to monetize directly...</p>}
+    />
   );
 }
 ```
 
-### Server-side payment verification
+Note: premium content is **not** passed as `children`. It lives on your server and is delivered only after payment verification. The optional `preview` prop is for safe-to-show teasers.
 
-Verify payments on your backend to prevent abuse:
+### Server: payment verification and content delivery
+
+The server is the security boundary. It verifies on-chain payment, records it, and delivers content. Premium content is never exposed to unauthenticated requests.
+
+**POST `/api/content/verify-payment`** — Verify a new payment and return content:
 
 ```typescript
 import { createPublicClient, http, parseEther, defineChain } from 'viem';
@@ -179,29 +226,48 @@ const publicClient = createPublicClient({
   transport: http(),
 });
 
+// Helper: look up the expected price for a content item
+function getContentPrice(contentId: string): string {
+  // In production, fetch from your database or config
+  const prices: Record<string, string> = {
+    'article-123': '0.10',
+    'video-456': '0.25',
+  };
+  return prices[contentId] ?? '0.10';
+}
+
 export default async function handler(req, res) {
   const { transactionHash, contentId, userAddress } = req.body;
 
   try {
-    // Fetch transaction receipt
+    // Check for replay — reject if this tx hash was already used
+    const existing = await db.payments.findOne({ transactionHash });
+    if (existing) {
+      if (existing.userAddress === userAddress && existing.contentId === contentId) {
+        const content = await db.content.findById(contentId);
+        return res.status(200).json({ verified: true, content: content.body });
+      }
+      return res.status(400).json({ error: 'Transaction already used' });
+    }
+
+    // Verify transaction on-chain
     const receipt = await publicClient.getTransactionReceipt({
       hash: transactionHash,
     });
 
-    // Verify transaction success
     if (receipt.status !== 'success') {
-      return res.status(400).json({ error: 'Payment failed' });
+      return res.status(400).json({ error: 'Payment transaction failed' });
     }
 
-    // Verify amount and recipient
+    // Verify amount
     const tx = await publicClient.getTransaction({ hash: transactionHash });
-    const expectedAmount = parseEther('0.10');
+    const expectedAmount = parseEther(getContentPrice(contentId));
 
-    if (tx.value !== expectedAmount) {
+    if (tx.value < expectedAmount) {
       return res.status(400).json({ error: 'Incorrect payment amount' });
     }
 
-    // Record successful payment in your database
+    // Record successful payment
     await db.payments.create({
       contentId,
       userAddress,
@@ -210,7 +276,9 @@ export default async function handler(req, res) {
       timestamp: new Date(),
     });
 
-    return res.status(200).json({ verified: true, access: true });
+    // Return content — this is the gate
+    const content = await db.content.findById(contentId);
+    return res.status(200).json({ verified: true, content: content.body });
   } catch (error) {
     console.error('Verification error:', error);
     return res.status(500).json({ error: 'Verification failed' });
@@ -218,10 +286,36 @@ export default async function handler(req, res) {
 }
 ```
 
+**GET `/api/content/:id/access`** — Check existing access for repeat visits:
+
+```typescript
+// GET /api/content/:id/access?address=0x...
+export default async function handler(req, res) {
+  const { id } = req.query;
+  const { address } = req.query;
+
+  if (!id || !address) {
+    return res.status(400).json({ error: 'Missing contentId or address' });
+  }
+
+  const payment = await db.payments.findOne({
+    contentId: id,
+    userAddress: address,
+  });
+
+  if (!payment) {
+    return res.status(403).json({ hasAccess: false });
+  }
+
+  const content = await db.content.findById(id);
+  return res.status(200).json({ hasAccess: true, content: content.body });
+}
+```
+
 ### Multiple price tiers
 
 ```typescript
-const contentTiers = {
+const contentTiers: Record<string, string> = {
   article: '0.05',   // 0.05 USD per article
   video: '0.25',     // 0.25 USD per video
   research: '1.00',  // 1.00 USD per research paper
@@ -229,21 +323,22 @@ const contentTiers = {
 };
 
 export function ContentLibrary() {
+  const items = [
+    { id: '1', title: 'Breaking News', type: 'article' },
+    { id: '2', title: 'Tutorial: viem on Radius', type: 'video' },
+    { id: '3', title: 'Stablecoin Economics', type: 'research' },
+  ];
+
   return (
     <div>
-      {[
-        { id: '1', title: 'Breaking News', type: 'article' },
-        { id: '2', title: 'Tutorial: viem on Radius', type: 'video' },
-        { id: '3', title: 'Stablecoin Economics', type: 'research' },
-      ].map((item) => (
+      {items.map((item) => (
         <ContentPaywall
           key={item.id}
           contentId={item.id}
           title={item.title}
           amount={contentTiers[item.type]}
-        >
-          <p>Content for {item.title}</p>
-        </ContentPaywall>
+          contentOwner="0x742d35Cc6634C0532925a3b844Bc9e7595f7E9F1"
+        />
       ))}
     </div>
   );
@@ -344,13 +439,15 @@ Test with Radius Testnet before going live. Get free test tokens from the faucet
 
 ### Best practices
 
-1. **Show the price upfront** — Users hate surprises. Display the cost before they click "unlock"
-2. **Make wallet connection obvious** — If not connected, guide users to connect before payment
-3. **Handle network errors gracefully** — Show retry buttons if payment fails
-4. **Store payment receipts** — Keep transaction hashes for support and analytics
-5. **Offer value for the price** — 0.10 USD articles should be substantial; avoid paywalling single paragraphs
-6. **Test on testnet first** — Always verify payment flow before production
-7. **Monitor gas costs** — Radius fees are low, but still track transaction costs
+1. **Never gate content client-side** — Always deliver premium content from the server after payment verification. A client-side `isUnlocked` flag is trivially bypassed via browser devtools
+2. **Show the price upfront** — Users hate surprises. Display the cost before they click "unlock"
+3. **Make wallet connection obvious** — If not connected, guide users to connect before payment
+4. **Handle network errors gracefully** — Show retry buttons if payment fails
+5. **Store payment receipts** — Keep transaction hashes for support, analytics, and replay protection
+6. **Check for replay** — Reject transaction hashes that have already been used for a different user or content item
+7. **Offer value for the price** — 0.10 USD articles should be substantial; avoid paywalling single paragraphs
+8. **Test on testnet first** — Always verify payment flow before production
+9. **Monitor gas costs** — Radius fees are low, but still track transaction costs
 
 ### Scaling considerations
 
