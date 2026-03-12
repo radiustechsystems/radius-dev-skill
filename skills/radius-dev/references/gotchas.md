@@ -249,22 +249,31 @@ async function readNonce(
 
 ---
 
-## 11. Set all three fee fields in estimateFeesPerGas
+## 11. EIP-1559 fee estimation can fail — force legacy `gasPrice`
 
-When overriding `estimateFeesPerGas` in the chain definition, return `gasPrice`, `maxFeePerGas`, and `maxPriorityFeePerGas` — all set to the same value. Omitting any one causes viem to fall back to EIP-1559 estimation logic that can produce invalid values on Radius.
+On Radius, EIP-1559 RPC signals can look valid but still lead clients to build invalid fee values:
+
+- `eth_gasPrice` returns ~`1 gwei` (usable)
+- `eth_maxPriorityFeePerGas` can return `0x0`
+- `eth_feeHistory` returns `baseFeePerGas`
+
+In this state, viem's EIP-1559 estimator may produce `maxFeePerGas: 0`, and the RPC rejects the transaction with `"Specified gas price is too low"`.
+
+Use an explicit legacy fee instead: fetch `gasPrice` and pass it directly in writes. This forces a type-0 transaction and bypasses broken EIP-1559 estimation.
 
 ```typescript
-fees: {
-  async estimateFeesPerGas() {
-    const gasPrice = await fetchGasPrice();
-    return {
-      gasPrice,
-      maxFeePerGas: gasPrice,
-      maxPriorityFeePerGas: gasPrice,
-    };
-  },
-},
+const gasPrice = await publicClient.getGasPrice();
+
+const hash = await walletClient.sendTransaction({
+    account,
+    to,
+    value,
+    data,
+    gasPrice, // <- explicit
+});
 ```
+
+Important: don't pass EIP-1559 fee fields (`maxFeePerGas` and `maxPriorityFeePerGas`) when using `gasPrice` — they will be ignored.
 
 ---
 
@@ -360,6 +369,11 @@ httpServer.listen(port);
 ```
 
 ---
+
+## 18. nodejs_compat to the CF Workers
+
+Using viem server-side in Cloudflare Workers requires compatibility_flags = ["nodejs_compat"] in wrangler.toml. Without it, the Worker fails silently at deploy time or crashes at runtime.
+
 
 ## Quick reference: environment variables
 

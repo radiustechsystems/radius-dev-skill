@@ -180,7 +180,7 @@ Before shipping, review [gotchas.md](gotchas.md) for:
 - Nonce collision handling under concurrent load
 - Block number is a timestamp (use BigInt, never parseInt)
 - Transaction receipts can be null even for confirmed transactions
-- EIP-2612 permit domain must match exactly: `{ name: "SBC", version: "1" }`
+- EIP-2612 permit domain must match exactly: `{ name: "Stable Coin", version: "1" }`
 
 ### 5. Test
 - Smart contracts: `forge test` locally, then deploy to Radius Testnet
@@ -195,14 +195,19 @@ When you implement changes, provide:
 - A short "risk notes" section for anything touching signing, fees, payments, or token transfers
 
 ## Progressive disclosure (read when needed)
+
+**Live docs (always current — fetch when needed):**
+- Network config, RPC endpoints, contract addresses, rate limiting: fetch `https://docs.radiustech.xyz/developer-resources/network-configuration.md`
+- EVM differences from Ethereum + Turnstile + architecture: fetch `https://docs.radiustech.xyz/developer-resources/ethereum-divergence.md`
+- Full Radius documentation corpus: fetch `https://docs.radiustech.xyz/llms-full.txt`
+
+**Local references (opinionated patterns and curated content):**
 - TypeScript reference (viem): [typescript-viem.md](typescript-viem.md)
 - Event watching + historical queries (viem): [events-viem.md](events-viem.md)
 - Smart contract deployment (Foundry): [smart-contracts.md](smart-contracts.md)
 - Wallet integration (wagmi / viem / MetaMask): [wallet-integration.md](wallet-integration.md)
 - Micropayment patterns: [micropayments.md](micropayments.md)
 - x402 protocol integration: [x402-integration.md](x402-integration.md)
-- EVM differences + Turnstile + architecture: [evm-differences.md](evm-differences.md)
-- Network config + contract addresses + RPC reference: [network-config.md](network-config.md)
 - Production gotchas: [gotchas.md](gotchas.md)
 - Security checklist: [security.md](security.md)
 - Curated reference links: [resources.md](resources.md)

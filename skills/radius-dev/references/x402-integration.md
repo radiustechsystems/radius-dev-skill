@@ -6,11 +6,13 @@
 
 Radius is a strong fit for x402 because fees are low (~0.0001 USD per transaction), finality is sub-second (~500ms), and costs are predictable.
 
+> **Protocol version:** This document targets **x402 v2**. v2 introduced CAIP-2 network identifiers, renamed HTTP headers, and standardized EIP-3009 as the required EVM token interface. See the [x402 v1→v2 migration guide](https://docs.x402.org/guides/migration-v1-to-v2.md) for the full diff.
+
 ## How x402 works
 
 1. **Agent sends request** to your API or content endpoint.
-2. **Your server returns HTTP 402** with payment terms (price, accepted tokens, facilitator URL).
-3. **Agent signs a payment** and resubmits the request with an `X-Payment` header.
+2. **Your server returns HTTP 402** with payment terms (price, accepted tokens, facilitator URL) in the `PAYMENT-REQUIRED` header.
+3. **Agent signs a payment** and resubmits the request with a `PAYMENT-SIGNATURE` header.
 4. **Facilitator verifies payment** and settles it on Radius.
 5. **Your server delivers the resource.**
 
@@ -18,10 +20,10 @@ Radius is a strong fit for x402 because fees are low (~0.0001 USD per transactio
 Agent                        Your Server                  Facilitator          Radius
   |                              |                            |                  |
   |--- GET /api/data ---------->|                            |                  |
-  |<-- 402 + X-Accept-Payment --|                            |                  |
+  |<-- 402 + PAYMENT-REQUIRED --|                            |                  |
   |                              |                            |                  |
   |--- GET /api/data ---------->|                            |                  |
-  |    + X-Payment header       |--- verify + settle ------->|                  |
+  |    + PAYMENT-SIGNATURE      |--- verify + settle ------->|                  |
   |                              |                            |--- settle tx --->|
   |                              |                            |<-- receipt ------|
   |                              |<-- { ok, payer, txHash } --|                  |
@@ -49,17 +51,17 @@ When a request hits a protected endpoint without payment proof:
 ```typescript
 // Response headers
 HTTP/1.1 402 Payment Required
-X-Accept-Payment: <base64-encoded JSON>
+PAYMENT-REQUIRED: <base64-encoded JSON>
 
 // Response body
 {
   "error": "Payment required",
-  "x402Version": 1,
+  "x402Version": 2,
   "accepts": [
     {
       "scheme": "exact",
-      "network": "radius",
-      "maxAmountRequired": "100000000000000000",
+      "network": "eip155:723",
+      "maxAmountRequired": "100000",
       "resource": "https://api.example.com/premium/report",
       "description": "Access to /premium/report",
       "mimeType": "application/json",
@@ -75,7 +77,7 @@ X-Accept-Payment: <base64-encoded JSON>
 
 ```
 GET /premium/report
-X-Payment: <base64-encoded JSON with signed permit>
+PAYMENT-SIGNATURE: <base64-encoded JSON with signed permit>
 ```
 
 ### Server confirms
@@ -85,20 +87,23 @@ HTTP/1.1 200 OK
 X-Payment-Verified: true
 X-Payment-Payer: 0x...
 X-Payment-Transaction: 0x...
+PAYMENT-RESPONSE: <base64-encoded settlement receipt>
 ```
+
+`X-Payment-Verified`, `X-Payment-Payer`, and `X-Payment-Transaction` are application-level headers you set. `PAYMENT-RESPONSE` is the protocol-level header carrying the facilitator's encoded settlement receipt (the v2 replacement for `X-PAYMENT-RESPONSE`).
 
 ## Payment payload structure
 
 ```json
 {
-  "x402Version": 1,
+  "x402Version": 2,
   "scheme": "exact",
-  "network": "radius",
+  "network": "eip155:723",
   "payload": {
     "kind": "permit-eip2612",
     "owner": "0x...",
     "spender": "0x...",
-    "value": "1000000000000000",
+    "value": "1000000",
     "nonce": "0",
     "deadline": "1741500000",
     "v": 28,
@@ -118,6 +123,7 @@ import { type Request, type Response } from 'express';
 const PAYMENT_AMOUNT = '100000'; // 0.10 SBC (6 decimals)
 const MERCHANT_ADDRESS = '0xYourMerchantAddress';
 const TOKEN_ADDRESS = '0x33ad9e4bd16b69b5bfded37d8b5d9ff9aba014fb'; // SBC on mainnet
+const RADIUS_MAINNET = 'eip155:723'; // CAIP-2 identifier for Radius mainnet
 
 function handleRequest(req: Request, res: Response) {
   // Non-protected paths pass through
@@ -125,13 +131,14 @@ function handleRequest(req: Request, res: Response) {
     return serveResource(req, res);
   }
 
-  const xPayment = req.headers['x-payment'] as string | undefined;
+  // v2: header is PAYMENT-SIGNATURE (was X-Payment in v1)
+  const xPayment = req.headers['payment-signature'] as string | undefined;
 
   // No payment header — return 402 with requirements
   if (!xPayment) {
     const requirement = {
       scheme: 'exact',
-      network: 'radius',
+      network: RADIUS_MAINNET,
       maxAmountRequired: PAYMENT_AMOUNT,
       resource: req.url,
       description: 'Access to protected resource',
@@ -141,7 +148,7 @@ function handleRequest(req: Request, res: Response) {
 
     return res.status(402).json({
       error: 'Payment required',
-      x402Version: 1,
+      x402Version: 2,
       accepts: [requirement],
     });
   }
@@ -165,6 +172,10 @@ function handleRequest(req: Request, res: Response) {
 
 The token you settle with determines which x402 strategies are available.
 
+### v2 EVM token requirement
+
+x402 v2 standardizes on **EIP-3009** (`transferWithAuthorization`) as the required interface for all EVM tokens. Tokens without EIP-3009 support require a custom facilitator path and lose several protocol guarantees (one-step atomicity, random nonces, explicit validity windows).
+
 ### EIP support overview
 
 | Standard | USDC (FiatTokenV2_2) | SBC (Radius native) | Impact |
@@ -172,19 +183,19 @@ The token you settle with determines which x402 strategies are available.
 | EIP-20 | ✅ | ✅ | Standard token transfers work |
 | EIP-712 | ✅ | ✅ | Typed-data signatures work |
 | EIP-2612 (`permit`) | ✅ | ✅ | Signature-based approvals work |
-| EIP-3009 (`transferWithAuthorization`) | ✅ | ❌ | One-transaction settlement unavailable for SBC |
+| EIP-3009 (`transferWithAuthorization`) | ✅ | ❌ | **Required for v2 EVM settlement.** SBC must use a custom two-step facilitator path |
 | EIP-1271 (contract-wallet signatures) | ✅ | ❌ | Smart-account compatibility reduced |
 
-### Why EIP-3009 matters
+### Why EIP-3009 matters more in v2
 
-EIP-3009 enables `transferWithAuthorization` — a single settlement transaction with no long-lived allowance footprint, concurrent authorization via random nonces, and explicit validity windows.
+EIP-3009 enables `transferWithAuthorization` — a single atomic settlement transaction with no long-lived allowance footprint, concurrent authorization via random nonces, and explicit validity windows. In v2, this is the **standard expected path** for all EVM tokens. Any facilitator built to the v2 spec will default to this path.
 
-Without EIP-3009, a facilitator uses EIP-2612 in two steps:
+Without EIP-3009, a facilitator must use EIP-2612 in two steps:
 
 1. Call `permit()` to grant allowance.
 2. Call `transferFrom()` to move funds.
 
-This two-step path increases gas, adds latency, and introduces a non-atomic window.
+This two-step path increases gas, adds latency, and introduces a non-atomic window. Because SBC does not implement EIP-3009, Radius x402 integrations using SBC require a custom facilitator that explicitly handles this path.
 
 ### Practical strategy for SBC on Radius
 
@@ -193,6 +204,7 @@ Use a custom facilitator path based on EIP-2612 `permit` + `transferFrom`:
 - Enforce nonce, amount, and expiry validation.
 - Enforce idempotency keys and replay protection.
 - Monitor settlement outcomes for partial or failed two-step execution paths.
+- Consider USDC (if bridged to Radius) for flows where EIP-3009 atomicity is required.
 
 ## Facilitator models
 
@@ -228,21 +240,28 @@ Build your own facilitator when:
 
 ## Facilitator settlement pseudocode
 
+The payment string arrives in the `PAYMENT-SIGNATURE` header. The function below handles both settlement strategies and reflects v2 field semantics (CAIP-2 network, `x402Version: 2`).
+
 ```typescript
 async function verifyAndSettlePayment(
-  xPayment: string,
+  xPayment: string,         // value of the PAYMENT-SIGNATURE header
   config: FacilitatorConfig
 ): Promise<SettlementResult> {
   const payment = decodeXPayment(xPayment);
 
+  // Validate protocol version
+  if (payment.x402Version !== 2) return { ok: false, error: 'Unsupported x402 version' };
+
   // Validate payment fields
   if (payment.scheme !== 'exact') return { ok: false, error: 'Unsupported scheme' };
-  if (payment.network !== config.networkName) return { ok: false, error: 'Wrong network' };
+  // Network uses CAIP-2 format: "eip155:723" (mainnet) or "eip155:72344" (testnet)
+  if (payment.network !== config.network) return { ok: false, error: 'Wrong network' };
   if (payment.asset !== config.asset) return { ok: false, error: 'Wrong asset' };
   if (payment.payTo !== config.paymentAddress) return { ok: false, error: 'Wrong payTo' };
 
   if (payment.payload.kind === 'permit-eip2612') {
-    // Validate permit fields
+    // SBC path: two-step settlement via EIP-2612 permit + transferFrom
+    // Note: EIP-3009 (single-step) is unavailable for SBC — see Token Compatibility section
     if (payment.payload.spender !== config.settlementSpender)
       return { ok: false, error: 'Wrong spender' };
     if (Date.now() / 1000 >= Number(payment.payload.deadline))
@@ -268,7 +287,8 @@ async function verifyAndSettlePayment(
   }
 
   if (payment.payload.kind === 'eip3009-transfer-with-authorization') {
-    // Single-step settlement (USDC only, not available for SBC)
+    // Standard v2 EVM path: single-step settlement via EIP-3009
+    // Available for USDC (and any EIP-3009 token) — NOT available for SBC
     if (BigInt(payment.payload.value) < config.requiredAmount)
       return { ok: false, error: 'Insufficient amount' };
 
@@ -288,8 +308,9 @@ async function verifyAndSettlePayment(
 
 Before settlement, validate:
 
+- [ ] `x402Version` is `2`
 - [ ] `scheme` matches expected value (for example, `exact`)
-- [ ] `network` matches Radius
+- [ ] `network` is the correct CAIP-2 identifier for Radius (`eip155:723` mainnet, `eip155:72344` testnet)
 - [ ] `asset` matches the accepted token contract
 - [ ] `payTo` matches your payment address
 - [ ] Signed amount ≥ required amount
@@ -323,23 +344,45 @@ Serve content to AI crawlers for a per-page fee instead of blocking them entirel
 ## Radius-specific configuration notes
 
 - Configure clients and settlement services with Radius network settings (see [network-config.md](network-config.md)).
+- Use the CAIP-2 network identifier for Radius: `eip155:723` (mainnet), `eip155:72344` (testnet).
 - Use Radius-compatible fee handling in transaction paths (see [evm-differences.md](evm-differences.md)).
 - Keep settlement wallets funded with RUSD for gas.
 - Use short validity windows to reduce replay risk.
 - Add structured logs for verification failures and settlement outcomes.
+
+## Header reference (v1 → v2)
+
+| Purpose | v1 Header | v2 Header |
+|---------|-----------|-----------|
+| 402 payment terms (server → client) | `X-Accept-Payment` | `PAYMENT-REQUIRED` |
+| Payment proof (client → server) | `X-Payment` | `PAYMENT-SIGNATURE` |
+| Facilitator settlement response | `X-PAYMENT-RESPONSE` | `PAYMENT-RESPONSE` |
+
+The application-level success headers (`X-Payment-Verified`, `X-Payment-Payer`, `X-Payment-Transaction`) are not protocol-defined — you set them yourself and can name them however you like.
+
+## Package reference (v1 → v2)
+
+| v1 Package | v2 Package |
+|------------|------------|
+| `x402` | `@x402/core` |
+| `x402-express` | `@x402/express` |
+| `x402-axios` | `@x402/axios` |
+| `x402-fetch` | `@x402/fetch` |
+| `x402-next` | `@x402/next` |
+| `x402-hono` | `@x402/hono` |
+| *(built-in)* | `@x402/evm` (EVM scheme support) |
 
 ## Migration from Base
 
 If you're settling x402 payments on Base today, moving to Radius is a configuration change:
 
 ```typescript
-// Base configuration
-const USDC_CONTRACT = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
+// Base configuration (v2 CAIP-2 format)
 const SETTLEMENT_RPC = 'https://mainnet.base.org';
+const NETWORK = 'eip155:8453';
 
-// Radius configuration
-const USDC_CONTRACT = '0x...'; // USDC on Radius (bridge or native)
 const SETTLEMENT_RPC = 'https://rpc.radiustech.xyz';
+const NETWORK = 'eip155:723';
 ```
 
 You keep the same smart contracts, same wallets, same stablecoin, same x402 protocol integration.
@@ -347,6 +390,8 @@ You keep the same smart contracts, same wallets, same stablecoin, same x402 prot
 ## Related resources
 
 - [x402.org](https://www.x402.org/) — Protocol specification
+- [x402 v1→v2 migration guide](https://docs.x402.org/guides/migration-v1-to-v2.md) — Full protocol diff
+- [x402 network and token support](https://docs.x402.org/core-concepts/network-and-token-support.md) — CAIP-2 identifiers and EIP-3009 requirements
 - [Radius x402 Facilitator (GitHub)](https://github.com/radiustechsystems/x402-facilitator) — Watch for deployment updates
 - [Stablecoin.xyz x402 docs](https://docs.stablecoin.xyz/x402/overview) — Hosted facilitator tooling
 - [Network config](network-config.md) — Radius endpoints and chain IDs
