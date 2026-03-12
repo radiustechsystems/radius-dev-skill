@@ -1,5 +1,8 @@
 .DS_Store
 
+.agents
+.claude
+
 # Logs
 logs
 *.log
