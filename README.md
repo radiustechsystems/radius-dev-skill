@@ -9,7 +9,7 @@ A Claude Code plugin marketplace from Radius providing skills to enhance AI-assi
 ```bash
 /plugin marketplace add https://github.com/radiustechsystems/skills.git
 
-/plugin install radius-dev@skills
+/plugin install radius@radius-dev-skill
 ```
 
 ### npx skills

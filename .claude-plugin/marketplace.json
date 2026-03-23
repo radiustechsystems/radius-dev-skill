@@ -5,27 +5,18 @@
         "name": "Radius Technology Systems"
     },
     "metadata": {
-        "version": "0.0.2",
+        "version": "0.0.3",
         "description": "Claude Code plugins from Radius Technology Systems for AI-assisted blockchain development on the Radius Network"
     },
     "plugins": [
         {
             "name": "radius-dev",
             "version": "0.0.1",
-            "description": "End-to-end Radius Network development playbook. Stablecoin-native EVM with sub-second finality. Covers TypeScript integration (plain viem), wallet integration (wagmi), smart contracts (Foundry), micropayments, x402 protocol, and EVM divergence from Ethereum.",
+            "description": "Radius Network development tools — blockchain development playbook and testnet faucet",
             "author": {
                 "name": "Radius Technology Systems"
             },
-            "source": "./skills/radius-dev"
-        },
-        {
-            "name": "dripping-faucet",
-            "version": "0.0.1",
-            "description": "Request testnet or mainnet tokens from a Radius Network faucet. Handles unsigned and signed drip requests with wallet identification, on-chain balance verification, and automatic signature fallback.",
-            "author": {
-                "name": "Radius Technology Systems"
-            },
-            "source": "./skills/dripping-faucet"
+            "source": "./plugins/radius"
         }
     ]
 }
