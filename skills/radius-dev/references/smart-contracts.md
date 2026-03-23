@@ -6,7 +6,7 @@ Radius is fully EVM-compatible. Deploy standard Solidity contracts using Foundry
 
 ## Prerequisites
 
-- A funded wallet (get testnet tokens from the [faucet](https://testnet.radiustech.xyz/testnet/faucet))
+- A funded wallet
 - Foundry installed
 
 ## Network configuration
@@ -459,7 +459,7 @@ Radius has the Arachnid Create2 Factory deployed at the canonical address:
 
 ## Deployment checklist
 
-1. **Get testnet funds** from the [faucet](https://testnet.radiustech.xyz/testnet/faucet)
+1. **Fund wallet** from the faucet (see Radius "dripping faucet" skill)
 2. **Verify RUSD balance** for fee payment
 3. **Compile contracts** with `forge build`
 4. **Run tests locally** with `forge test`
@@ -479,7 +479,7 @@ cast call 0xF966020a30946A64B39E2e243049036367590858 \
   --rpc-url https://rpc.testnet.radiustech.xyz
 ```
 
-If balance is zero, visit the [faucet](https://testnet.radiustech.xyz/testnet/faucet).
+If balance is zero, visit the faucet (see Radius "dripping faucet" skill).
 
 ### Contract not found after deploy
 

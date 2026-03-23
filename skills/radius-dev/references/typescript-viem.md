@@ -446,7 +446,7 @@ Private Key: 0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d
 
 These are well-known test keys. **Never use them in production.**
 
-For other accounts, fund via the [Radius Testnet Faucet](https://testnet.radiustech.xyz/testnet/faucet).
+For other accounts, fund via the faucet (see Radius "dripping faucet" skill).
 
 ## Error handling
 
@@ -542,5 +542,4 @@ async function transfer(
 | **Native Token** | RUSD (18 decimals) | RUSD (18 decimals) |
 | **SBC Token** | — | `0x33ad9e4bd16b69b5bfded37d8b5d9ff9aba014fb` (6 decimals) |
 | **Block Explorer** | `https://testnet.radiustech.xyz` | `https://network.radiustech.xyz` |
-| **Faucet** | `https://testnet.radiustech.xyz/testnet/faucet` | — |
 | **Tx Cost API** | `https://testnet.radiustech.xyz/api/v1/network/transaction-cost` | `https://network.radiustech.xyz/api/v1/network/transaction-cost` |

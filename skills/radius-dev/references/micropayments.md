@@ -435,7 +435,7 @@ export default function RootApp() {
 
 #### 4. Deploy and test
 
-Test with Radius Testnet before going live. Get free test tokens from the faucet: https://testnet.radiustech.xyz/testnet/faucet
+Test with Radius Testnet before going live.
 
 ### Best practices
 
@@ -708,8 +708,6 @@ CLIENT_PRIVATE_KEY=0x...
 # For client: server's address (where to send payments)
 SERVER_ADDRESS=0x...
 ```
-
-Get testnet tokens from the [Radius Faucet](https://testnet.radiustech.xyz/testnet/faucet) for both wallets.
 
 ```bash
 # Terminal 1: Start server
@@ -1197,6 +1195,3 @@ setInterval(() => {
 | **Native Token** | RUSD |
 | **Block time** | ~2-3 seconds |
 | **Transaction cost** | ~0.0001 USD |
-| **Faucet** | `https://testnet.radiustech.xyz/testnet/faucet` |
-
-Testnet is perfect for experimenting with all micropayment patterns. Get free RUSD tokens from the faucet to start building.

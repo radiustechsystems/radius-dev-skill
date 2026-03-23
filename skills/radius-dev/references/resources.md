@@ -5,7 +5,6 @@
 - [Radius Documentation](https://docs.radiustech.xyz/) — Official developer documentation
 - [Radius Network Explorer (mainnet)](https://network.radiustech.xyz) — Block explorer for Radius Network
 - [Radius Testnet Explorer](https://testnet.radiustech.xyz) — Block explorer for Radius Testnet
-- [Radius Testnet Faucet](https://testnet.radiustech.xyz/testnet/faucet) — Get free RUSD test tokens
 - [Radius Discord](https://discord.gg/radiustech) — Community support and discussions
 
 ### LLM-friendly documentation
