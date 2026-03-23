@@ -10,7 +10,7 @@
     },
     "plugins": [
         {
-            "name": "radius",
+            "name": "radius-dev",
             "version": "0.0.1",
             "description": "Radius Network development tools — blockchain development playbook and testnet faucet",
             "author": {
