@@ -15,7 +15,7 @@ Radius is fully EVM-compatible. Deploy standard Solidity contracts using Foundry
 |---------|-------|
 | **RPC URL** | `https://rpc.testnet.radiustech.xyz` |
 | **Chain ID** | `72344` |
-| **Fee Token** | RUSD (`0xF966020a30946A64B39E2e243049036367590858`) |
+| **SBC Token** | `0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb` (6 decimals) |
 
 ## Install Foundry
 
@@ -157,25 +157,9 @@ cast send 0xContractAddress "increment()" \
 ### Using viem (TypeScript)
 
 ```typescript
-import { createPublicClient, createWalletClient, http, defineChain, getContract } from 'viem';
+import { createPublicClient, createWalletClient, http, getContract } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
-
-// Define Radius Testnet (see typescript-viem.md for the full chain definition)
-const radiusTestnet = defineChain({
-  id: 72344,
-  name: 'Radius Testnet',
-  nativeCurrency: { decimals: 18, name: 'RUSD', symbol: 'RUSD' },
-  rpcUrls: { default: { http: ['https://rpc.testnet.radiustech.xyz'] } },
-  fees: {
-    async estimateFeesPerGas() {
-      const res = await fetch(
-        'https://testnet.radiustech.xyz/api/v1/network/transaction-cost'
-      );
-      const { gas_price_wei } = await res.json();
-      return { gasPrice: BigInt(gas_price_wei) };
-    },
-  },
-});
+import { radiusTestnet } from './chain'; // See SKILL.md "Canonical chain definitions" to create this file
 
 const account = privateKeyToAccount(process.env.PRIVATE_KEY as `0x${string}`);
 
@@ -324,7 +308,7 @@ Radius uses stablecoin fees instead of native gas:
 ### Check fee token balance
 
 ```bash
-cast call 0xF966020a30946A64B39E2e243049036367590858 \
+cast call 0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb \
   "balanceOf(address)" 0xYourAddress \
   --rpc-url https://rpc.testnet.radiustech.xyz
 ```
@@ -474,7 +458,7 @@ Radius has the Arachnid Create2 Factory deployed at the canonical address:
 Check that your account has RUSD tokens for fees:
 
 ```bash
-cast call 0xF966020a30946A64B39E2e243049036367590858 \
+cast call 0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb \
   "balanceOf(address)" 0xYourAddress \
   --rpc-url https://rpc.testnet.radiustech.xyz
 ```
@@ -524,16 +508,53 @@ Create `foundry.toml` with Radius defaults:
 src = "src"
 out = "out"
 libs = ["lib"]
-solc = "0.8.20"
+gas_price = 1000000000
+evm_version = "cancun"
+via_ir = true
 
 [profile.default.rpc_endpoints]
 radius_testnet = "https://rpc.testnet.radiustech.xyz"
+radius_mainnet = "https://rpc.radiustech.xyz"
 ```
+
+| Setting | Purpose |
+|---------|---------|
+| `gas_price` | Matches Radius's fixed gas price (~1 gwei). Eliminates the need for `--gas-price` on every CLI command. |
+| `evm_version` | Targets the EVM version Radius supports. |
+| `via_ir` | Uses the IR-based code generator. Required for complex deploy scripts to avoid "Stack too deep" errors. |
 
 Then deploy with the profile:
 
 ```bash
 forge create src/Counter.sol:Counter \
   --rpc-url radius_testnet \
-  --account radius-deployer
+  --account radius-deployer \
+  --broadcast
 ```
+
+> Starting with Foundry 1.5.1, `forge create` defaults to dry-run mode. Add `--broadcast` to send the transaction on-chain.
+
+## OpenZeppelin governance and timestamp clock mode
+
+Radius block numbers are millisecond timestamps, not sequential heights. This breaks OpenZeppelin governance contracts that interpret block counts as time durations:
+
+| Contract | Parameter | Ethereum interpretation | Radius interpretation | Fix |
+|----------|-----------|------------------------|----------------------|-----|
+| Governor | `votingDelay()` = 1 | ~12 seconds (1 block) | 1 millisecond | Use timestamp clock mode |
+| Governor | `votingPeriod()` = 50400 | ~1 week | ~50 seconds | Use timestamp clock mode |
+| TimelockController | Block-based delay | Predictable intervals | Millisecond timestamps | Use `block.timestamp` |
+| Vesting | Block-based schedule | Predictable duration | Incorrect duration | Use `block.timestamp` |
+
+Override the clock in OpenZeppelin v5:
+
+```solidity
+function CLOCK_MODE() public pure override returns (string memory) {
+    return "mode=timestamp";
+}
+
+function clock() public view override returns (uint48) {
+    return uint48(block.timestamp);
+}
+```
+
+Apply these overrides to any contract inheriting Governor, TimelockController, or timestamp-sensitive vesting logic.

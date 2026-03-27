@@ -3,6 +3,10 @@
 ## Radius Documentation & Tools
 
 - [Radius Documentation](https://docs.radiustech.xyz/) — Official developer documentation
+- [Ethereum compatibility](https://docs.radiustech.xyz/developer-resources/ethereum-compatibility.md) — EVM behavior differences, Turnstile, balance methods, RPC constraints
+- [Tooling configuration](https://docs.radiustech.xyz/developer-resources/tooling-configuration.md) — Foundry, viem, wagmi, Hardhat, ethers.js setup
+- [Fees](https://docs.radiustech.xyz/developer-resources/fees.md) — Fee structure and transaction costs
+- [JSON-RPC API reference](https://docs.radiustech.xyz/developer-resources/json-rpc-api.md) — Method support, EIP-7966, error codes
 - [Radius Network Explorer (mainnet)](https://network.radiustech.xyz) — Block explorer for Radius Network
 - [Radius Testnet Explorer](https://testnet.radiustech.xyz) — Block explorer for Radius Testnet
 - [Radius Discord](https://discord.gg/radiustech) — Community support and discussions
@@ -31,6 +35,12 @@
 
 ### @tanstack/react-query
 - [TanStack Query Documentation](https://tanstack.com/query) — Required peer dependency for wagmi
+
+### Hardhat
+- [Hardhat Documentation](https://hardhat.org/) — Pin to v2 for Radius compatibility (`hardhat@^2.22.0`; v3 incompatible)
+
+### ethers.js
+- [ethers.js Documentation](https://docs.ethers.org/) — Works out of the box with Radius (no overrides needed)
 
 ## Smart Contract Development
 
@@ -70,6 +80,7 @@
 - [EIP-2930](https://eips.ethereum.org/EIPS/eip-2930) — Access lists
 - [EIP-4844](https://eips.ethereum.org/EIPS/eip-4844) — Blob transactions
 - [EIP-7702](https://eips.ethereum.org/EIPS/eip-7702) — Set EOA account code
+- [EIP-7966](https://eips.ethereum.org/EIPS/eip-7966) — `eth_sendRawTransactionSync` (synchronous tx submission; supported on Radius)
 
 ## Wallet Integration
 
@@ -86,13 +97,18 @@
 - [Stablecoin.xyz x402 client docs](https://docs.stablecoin.xyz/x402/sdk) — Client documentation
 - [Stablecoin.xyz x402 facilitator](https://docs.stablecoin.xyz/x402/facilitator) — Facilitator documentation
 
+### Endorsed facilitators
+- Stablecoin.xyz: `https://x402.stablecoin.xyz` (mainnet + testnet, v1 + v2)
+- FareSide: `https://facilitator.x402.rs` (testnet only, v2)
+- Middlebit: `https://middlebit.com` (mainnet, routes via stablecoin.xyz)
+
 ## Deployed Contracts
 
 ### Radius Network (mainnet)
 
 | Contract | Address | Decimals |
 |----------|---------|----------|
-| SBC Token | `0x33ad9e4bd16b69b5bfded37d8b5d9ff9aba014fb` | **6** |
+| SBC Token | `0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb` | **6** |
 | Arachnid Create2 Factory | `0x4e59b44847b379578588920cA78FbF26c0B4956C` | — |
 | Permit2 | `0x000000000022D473030F116dDEE9F6B43aC78BA3` | — |
 | Multicall3 | `0xcA11bde05977b3631167028862bE2a173976CA11` | — |
@@ -102,13 +118,24 @@
 
 | Contract | Address | Decimals |
 |----------|---------|----------|
-| radUSD Token | `0xF966020a30946A64B39E2e243049036367590858` | 18 |
+| SBC Token | `0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb` | **6** |
 | Arachnid Create2 Factory | `0x4e59b44847b379578588920cA78FbF26c0B4956C` | — |
 | CreateX | `0xba5Ed099633D3B313e4D5F7bdc1305d3c28ba5Ed` | — |
 | Multicall3 | `0xcA11bde05977b3631167028862bE2a173976CA11` | — |
 | Permit2 | `0x000000000022D473030F116dDEE9F6B43aC78BA3` | — |
 | EntryPoint v0.7 | `0x9b443e4bd122444852B52331f851a000164Cc83F` | — |
 | SimpleAccountFactory | `0x4DEbDe0Be05E51432D9afAf61D84F7F0fEA63495` | — |
+
+## Bridging
+
+Bridge stablecoins (USDC, SBC) to Radius from other networks:
+
+| Source | Estimated time | Notes |
+|--------|---------------|-------|
+| Ethereum → Radius | ~5-10 minutes | USDC and SBC supported |
+| Base → Radius | ~1-2 minutes | USDC and SBC supported |
+
+See the [Getting Started guide](https://docs.radiustech.xyz/get-started/getting-started.md) for bridge URLs and step-by-step instructions.
 
 ## Security Resources
 

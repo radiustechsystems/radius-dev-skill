@@ -16,12 +16,19 @@ Requirements:
 
 ## Chain definition
 
-Define the Radius chain with `fees.estimateFeesPerGas()` so viem always uses the correct fixed gas price:
-
-### Testnet
+Define the Radius chain with `fees.estimateFeesPerGas()` so viem always uses the correct fixed gas price. The fee override queries `eth_gasPrice` from the RPC and sets both EIP-1559 fee fields to the same value:
 
 ```typescript
 import { defineChain } from 'viem';
+import type { Chain, Client } from 'viem';
+
+const radiusFees = {
+  async estimateFeesPerGas(args: { client: Client }) {
+    const gasPrice = await args.client.request({ method: 'eth_gasPrice' });
+    const price = BigInt(gasPrice);
+    return { maxFeePerGas: price, maxPriorityFeePerGas: price };
+  },
+} satisfies Chain['fees'];
 
 export const radiusTestnet = defineChain({
   id: 72344,
@@ -31,23 +38,11 @@ export const radiusTestnet = defineChain({
     default: { http: ['https://rpc.testnet.radiustech.xyz'] },
   },
   blockExplorers: {
-    default: { name: 'Radius Explorer', url: 'https://testnet.radiustech.xyz' },
+    default: { name: 'Radius Testnet Explorer', url: 'https://testnet.radiustech.xyz' },
   },
-  fees: {
-    async estimateFeesPerGas() {
-      const res = await fetch(
-        'https://testnet.radiustech.xyz/api/v1/network/transaction-cost'
-      );
-      const { gas_price_wei } = await res.json();
-      return { gasPrice: BigInt(gas_price_wei) };
-    },
-  },
+  fees: radiusFees,
 });
-```
 
-### Mainnet
-
-```typescript
 export const radiusMainnet = defineChain({
   id: 723,
   name: 'Radius Network',
@@ -58,15 +53,7 @@ export const radiusMainnet = defineChain({
   blockExplorers: {
     default: { name: 'Radius Explorer', url: 'https://network.radiustech.xyz' },
   },
-  fees: {
-    async estimateFeesPerGas() {
-      const res = await fetch(
-        'https://network.radiustech.xyz/api/v1/network/transaction-cost'
-      );
-      const { gas_price_wei } = await res.json();
-      return { gasPrice: BigInt(gas_price_wei) };
-    },
-  },
+  fees: radiusFees,
 });
 ```
 
@@ -108,7 +95,7 @@ const hash = await walletClient.sendTransaction({
   value: parseEther('0.5'),
 });
 
-// Wait for confirmation (~500ms on Radius, transaction is FINAL)
+// Wait for confirmation (~200-500ms on Radius, transaction is FINAL)
 const receipt = await publicClient.waitForTransactionReceipt({ hash });
 console.log('Status:', receipt.status);
 ```
@@ -179,7 +166,7 @@ const gas = await publicClient.estimateGas({
 
 // Get contract code
 const code = await publicClient.getCode({
-  address: '0xF966020a30946A64B39E2e243049036367590858',
+  address: '0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb',
 });
 ```
 
@@ -194,7 +181,7 @@ const hash = await walletClient.sendTransaction({
   value: parseEther('0.5'),
 });
 
-// Wait for receipt (~500ms on Radius, transaction is FINAL)
+// Wait for receipt (~200-500ms on Radius, transaction is FINAL)
 const receipt = await publicClient.waitForTransactionReceipt({ hash });
 
 if (receipt.status === 'success') {
@@ -239,7 +226,7 @@ const abi = parseAbi([
 ]);
 
 const contract = getContract({
-  address: '0xF966020a30946A64B39E2e243049036367590858',
+  address: '0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb',
   abi,
   client: { public: publicClient, wallet: walletClient },
 });
@@ -284,7 +271,7 @@ if (receipt.status === 'success' && receipt.contractAddress) {
 import { getContract, erc20Abi } from 'viem';
 
 const token = getContract({
-  address: '0xF966020a30946A64B39E2e243049036367590858',
+  address: '0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb',
   abi: erc20Abi,
   client: publicClient,
 });
@@ -302,15 +289,15 @@ console.log(`Balance: ${balance} ${symbol} (${decimals} decimals)`);
 import { getContract, erc20Abi } from 'viem';
 
 const token = getContract({
-  address: '0xF966020a30946A64B39E2e243049036367590858',
+  address: '0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb',
   abi: erc20Abi,
   client: { public: publicClient, wallet: walletClient },
 });
 
-// Transfer 1 token (18 decimals for radUSD on testnet)
+// Transfer 1 SBC token (6 decimals)
 const hash = await token.write.transfer([
   '0x70997970C51812dc3A010C7d01b50e0d17dc79C8',
-  1000000000000000000n,
+  1000000n, // 1.0 SBC = 1_000_000 base units (6 decimals)
 ]);
 
 const receipt = await publicClient.waitForTransactionReceipt({ hash });
@@ -320,7 +307,7 @@ if (receipt.status === 'success') {
 }
 ```
 
-> **Critical:** SBC on mainnet uses **6 decimals**. radUSD on testnet uses 18. Always check `decimals()` or use `parseUnits(amount, 6)` for SBC and `parseEther(amount)` for RUSD. See [gotchas.md](gotchas.md).
+> **Critical:** SBC uses **6 decimals** on both testnet and mainnet. Always use `parseUnits(amount, 6)` for SBC and `parseEther(amount)` for RUSD (native token). See [gotchas.md](gotchas.md).
 
 ### Approve and transferFrom
 
@@ -533,6 +520,50 @@ async function transfer(
 }
 ```
 
+## EIP-7966: Synchronous transactions
+
+Radius supports `eth_sendRawTransactionSync` (EIP-7966), which submits a transaction and waits for the receipt in a single RPC call — roughly 50% less latency than the standard `sendTransaction` + `waitForTransactionReceipt` polling pattern.
+
+```typescript
+import { serializeTransaction, signTransaction } from 'viem';
+import { privateKeyToAccount } from 'viem/accounts';
+
+const account = privateKeyToAccount(process.env.RADIUS_PRIVATE_KEY as `0x${string}`);
+
+// Sign the transaction
+const signedTx = await account.signTransaction({
+  to: '0x70997970C51812dc3A010C7d01b50e0d17dc79C8',
+  value: 1000000n,
+  chainId: radiusTestnet.id,
+  gasPrice: await publicClient.getGasPrice(),
+  gas: 21000n,
+  nonce: await publicClient.getTransactionCount({ address: account.address }),
+});
+
+// Submit synchronously — returns receipt directly (no polling)
+const result = await publicClient.request({
+  method: 'eth_sendRawTransactionSync' as any,
+  params: [signedTx],
+});
+```
+
+### Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `signedTx` | hex string | Yes | Signed raw transaction |
+| `timeout` | number | No | Timeout in ms (default: 2000) |
+
+### Error codes
+
+| Code | Meaning | Action |
+|------|---------|--------|
+| 4 | Timeout — receipt not ready in time | Retry or fall back to `waitForTransactionReceipt` |
+| 5 | Unknown / queued — tx accepted but not yet executed | Poll with `getTransactionReceipt` |
+| 6 | Nonce gap — a prior nonce is missing | Fix nonce sequencing, then retry |
+
+> **When to use:** Ideal for latency-sensitive server-side flows (API metering, settlement). For browser wallets, stick with `sendTransaction` + `waitForTransactionReceipt` since the wallet handles signing.
+
 ## Network reference
 
 | Setting | Testnet | Mainnet |
@@ -540,6 +571,6 @@ async function transfer(
 | **RPC Endpoint** | `https://rpc.testnet.radiustech.xyz` | `https://rpc.radiustech.xyz` |
 | **Chain ID** | `72344` | `723` |
 | **Native Token** | RUSD (18 decimals) | RUSD (18 decimals) |
-| **SBC Token** | — | `0x33ad9e4bd16b69b5bfded37d8b5d9ff9aba014fb` (6 decimals) |
+| **SBC Token** | `0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb` (6 decimals) | `0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb` (6 decimals) |
 | **Block Explorer** | `https://testnet.radiustech.xyz` | `https://network.radiustech.xyz` |
 | **Tx Cost API** | `https://testnet.radiustech.xyz/api/v1/network/transaction-cost` | `https://network.radiustech.xyz/api/v1/network/transaction-cost` |
