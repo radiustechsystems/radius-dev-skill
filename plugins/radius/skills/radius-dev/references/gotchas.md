@@ -23,29 +23,17 @@ The authoritative docs confirm: "RUSD uses 18 decimals, while SBC uses 6. For SB
 
 ## 2. Gas price is NOT zero
 
-The skill previously stated `eth_gasPrice` returns `0x0`. This is **wrong**.
-
 - `eth_gasPrice` returns the fixed gas price (~986M wei, ~1 gwei).
 - `eth_maxPriorityFeePerGas` returns `0x0` (no priority fee bidding).
 
-Always use the transaction cost API for the most reliable value:
+Query the gas price via `eth_gasPrice` RPC (the canonical chain definition does this automatically):
 
 ```typescript
-async function fetchGasPrice(): Promise<bigint> {
-  try {
-    const res = await fetch(
-      'https://testnet.radiustech.xyz/api/v1/network/transaction-cost'
-    );
-    const data = await res.json();
-    const price = BigInt(data.gas_price_wei);
-    return price > 0n ? price : 986000000n;
-  } catch {
-    return 986000000n; // ~1 gwei fallback
-  }
-}
+const gasPrice = await publicClient.request({ method: 'eth_gasPrice' });
+const price = BigInt(gasPrice); // ~986000000n (~1 gwei)
 ```
 
-Define `fees.estimateFeesPerGas()` in your chain config. If tooling derives zero or invalid fee values, transactions fail silently.
+Define `fees.estimateFeesPerGas()` in your chain config — it queries `eth_gasPrice` and sets both `maxFeePerGas` and `maxPriorityFeePerGas` to the same value. If tooling derives zero or invalid fee values, transactions fail silently.
 
 ---
 
@@ -197,7 +185,7 @@ const domain = {
   name: 'Stable Coin',          // NOT "SBC", NOT "Radius SBC"
   version: '1',         // String "1", not number 1
   chainId: 723,         // Actual chain ID as a number
-  verifyingContract: '0x33ad9e4bd16b69b5bfded37d8b5d9ff9aba014fb',
+  verifyingContract: '0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb',
 };
 ```
 
@@ -374,6 +362,62 @@ httpServer.listen(port);
 
 Using viem server-side in Cloudflare Workers requires compatibility_flags = ["nodejs_compat"] in wrangler.toml. Without it, the Worker fails silently at deploy time or crashes at runtime.
 
+
+## 19. `eth_getLogs` requires an address filter
+
+Unlike Ethereum, Radius **requires** an `address` field on all `eth_getLogs` calls. Omitting it returns error `-33014`.
+
+Additionally, the block range is capped at 1,000,000 units. Because block numbers are millisecond timestamps, this covers ~16 minutes 40 seconds (not ~1 million blocks). Exceeding this range returns error `-33002`.
+
+```typescript
+// WRONG — returns error -33014 on Radius
+const logs = await publicClient.getLogs({
+  fromBlock: startBlock,
+  toBlock: endBlock,
+});
+
+// CORRECT — always include address
+const logs = await publicClient.getLogs({
+  address: contractAddress,
+  fromBlock: startBlock,
+  toBlock: endBlock,
+});
+```
+
+For large time ranges, split into consecutive chunks of up to 1,000,000 block units.
+
+---
+
+## 20. `blockhash()` is predictable — NOT random
+
+On Radius, `BLOCKHASH` returns a timestamp-derived value, not a cryptographic hash. `blockhash(block.number - 1)` returns the previous millisecond timestamp cast to `bytes32`.
+
+Any contract using `blockhash()` as a randomness source is **exploitable** on Radius.
+
+```solidity
+// INSECURE on Radius — value is fully predictable
+uint256 random = uint256(blockhash(block.number - 1));
+uint256 winner = random % participants.length;
+
+// USE INSTEAD — Chainlink VRF or off-chain oracle for randomness
+```
+
+Vulnerable patterns: lotteries, NFT trait generation, commit-reveal schemes hashing against `blockhash()`, gaming contracts with randomized outcomes.
+
+---
+
+## 21. Historical state queries not supported
+
+`eth_getBalance`, `eth_call`, `eth_getCode`, `eth_getStorageAt`, and `eth_getTransactionCount` **ignore the block tag parameter**. Whether you pass `"earliest"`, a specific past block number, or `"latest"`, the response reflects current state.
+
+Radius does not support archive mode or historical state access.
+
+Implications:
+- Foundry fork mode (`--fork-block-number`) cannot query past state.
+- Debugging reverted transactions with `eth_call` at a past block is not available.
+- Price oracles and analytics that read historical balances return current values instead.
+
+---
 
 ## Quick reference: environment variables
 

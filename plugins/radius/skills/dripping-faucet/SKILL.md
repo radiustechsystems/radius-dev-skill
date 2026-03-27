@@ -34,7 +34,7 @@ When the mainnet URL becomes available, the same flow applies — only the base 
 | Chain ID | `72344` | `723` |
 | RPC URL | `https://rpc.testnet.radiustech.xyz` | `https://rpc.radiustech.xyz` |
 | Native Currency | RUSD (18 decimals) | RUSD (18 decimals) |
-| SBC Contract | `0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb` | `0x33ad9e4bd16b69b5bfded37d8b5d9ff9aba014fb` |
+| SBC Contract | `0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb` | `0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb` |
 | SBC Decimals | **6** (not 18) | **6** (not 18) |
 | Tx Cost API | `https://testnet.radiustech.xyz/api/v1/network/transaction-cost` | `https://network.radiustech.xyz/api/v1/network/transaction-cost` |
 
@@ -105,14 +105,22 @@ Every `curl` and `cast` call in the examples below includes an explicit `echo` o
 ## TypeScript Example (viem)
 
 ```typescript
-import { defineChain, createPublicClient, http, erc20Abi, isAddress } from 'viem';
+import { defineChain, createPublicClient, http, erc20Abi, isAddress, formatUnits } from 'viem';
+import type { Chain, Client } from 'viem';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
-import { formatUnits } from 'viem';
 
 // --- Configuration ---
 const FAUCET_URL = 'https://testnet.radiustech.xyz/api/v1/faucet';
 const SBC_CONTRACT = '0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb' as const;
 const SBC_DECIMALS = 6;
+
+const radiusFees = {
+  async estimateFeesPerGas(args: { client: Client }) {
+    const gasPrice = await args.client.request({ method: 'eth_gasPrice' });
+    const price = BigInt(gasPrice);
+    return { maxFeePerGas: price, maxPriorityFeePerGas: price };
+  },
+} satisfies Chain['fees'];
 
 const radiusTestnet = defineChain({
   id: 72344,
@@ -120,17 +128,9 @@ const radiusTestnet = defineChain({
   nativeCurrency: { decimals: 18, name: 'RUSD', symbol: 'RUSD' },
   rpcUrls: { default: { http: ['https://rpc.testnet.radiustech.xyz'] } },
   blockExplorers: {
-    default: { name: 'Radius Explorer', url: 'https://testnet.radiustech.xyz' },
+    default: { name: 'Radius Testnet Explorer', url: 'https://testnet.radiustech.xyz' },
   },
-  fees: {
-    async estimateFeesPerGas() {
-      const res = await fetch(
-        'https://testnet.radiustech.xyz/api/v1/network/transaction-cost'
-      );
-      const { gas_price_wei } = await res.json();
-      return { gasPrice: BigInt(gas_price_wei) };
-    },
-  },
+  fees: radiusFees,
 });
 
 // --- Wallet setup ---

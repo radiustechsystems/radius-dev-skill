@@ -319,6 +319,19 @@ Radius's architecture removes several Ethereum-specific attack vectors:
 | **MEV / sandwich attacks** | Common (public mempool) | Minimal (no global mempool, per-shard consensus) |
 | **Block-level manipulation** | Miners/validators can reorder | Raft consensus eliminates reordering |
 | **Confirmation-based fraud** | Accept 1-confirmation, then reorg | Once confirmed, it is final |
+| **`blockhash()` randomness** | Cryptographic hash | Timestamp-derived (fully predictable) |
+
+### `blockhash()` is predictable on Radius
+
+`BLOCKHASH` returns a timestamp-derived value, not a cryptographic hash. Any contract using `blockhash()` as a randomness source is exploitable.
+
+```solidity
+// INSECURE on Radius — value is the previous millisecond timestamp
+uint256 random = uint256(blockhash(block.number - 1));
+uint256 winner = random % participants.length;
+```
+
+Vulnerable patterns: lotteries, raffles, NFT trait generation, commit-reveal schemes, gaming outcomes. Use Chainlink VRF or an off-chain oracle for randomness.
 
 ### Stablecoin fee model considerations
 
@@ -383,6 +396,8 @@ Despite the architectural improvements, all standard smart contract security pra
 - [ ] Events emitted for all state changes (for off-chain indexing and monitoring)
 - [ ] Emergency pause mechanism available via OpenZeppelin's `Pausable`
 - [ ] Upgrade mechanism is properly access-controlled (if using proxies)
+- [ ] OpenZeppelin Governor/TimelockController/vesting contracts override `CLOCK_MODE()` → `"mode=timestamp"` and `clock()` → `uint48(block.timestamp)` (Radius block numbers are timestamps)
+- [ ] No contract uses `blockhash()` for randomness (predictable on Radius)
 
 ### External Interactions
 - [ ] External contract addresses are validated before calls

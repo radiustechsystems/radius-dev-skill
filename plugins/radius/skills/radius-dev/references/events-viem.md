@@ -6,26 +6,11 @@ Radius supports standard EVM event watching and log queries using **plain viem**
 
 ## Setup
 
-Create a public client with the Radius chain definition (see [typescript-viem.md](typescript-viem.md) for the full `defineChain` pattern):
+Create a public client with the Radius chain definition (see [typescript-viem.md](typescript-viem.md) for the full `defineChain` pattern including `fees.estimateFeesPerGas()`):
 
 ```typescript
-import { createPublicClient, http, defineChain } from 'viem';
-
-const radiusTestnet = defineChain({
-  id: 72344,
-  name: 'Radius Testnet',
-  nativeCurrency: { decimals: 18, name: 'RUSD', symbol: 'RUSD' },
-  rpcUrls: { default: { http: ['https://rpc.testnet.radiustech.xyz'] } },
-  fees: {
-    async estimateFeesPerGas() {
-      const res = await fetch(
-        'https://testnet.radiustech.xyz/api/v1/network/transaction-cost'
-      );
-      const { gas_price_wei } = await res.json();
-      return { gasPrice: BigInt(gas_price_wei) };
-    },
-  },
-});
+import { createPublicClient, http } from 'viem';
+import { radiusTestnet } from './chain'; // See SKILL.md "Canonical chain definitions" to create this file
 
 const publicClient = createPublicClient({
   chain: radiusTestnet,
@@ -60,7 +45,7 @@ unwatch();
 import { erc20Abi } from 'viem';
 
 const unwatch = publicClient.watchContractEvent({
-  address: '0xF966020a30946A64B39E2e243049036367590858', // Token contract
+  address: '0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb', // Token contract
   abi: erc20Abi,
   eventName: 'Transfer',
   onLogs: (logs) => {
@@ -86,7 +71,7 @@ unwatch();
 
 ```typescript
 const unwatch = publicClient.watchContractEvent({
-  address: '0xF966020a30946A64B39E2e243049036367590858',
+  address: '0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb',
   abi: erc20Abi,
   eventName: 'Transfer',
   args: {
@@ -102,7 +87,7 @@ const unwatch = publicClient.watchContractEvent({
 
 ```typescript
 const unwatch = publicClient.watchContractEvent({
-  address: '0xF966020a30946A64B39E2e243049036367590858',
+  address: '0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb',
   abi: erc20Abi,
   eventName: 'Transfer',
   args: {
@@ -120,7 +105,7 @@ To watch both directions, set up two watchers:
 
 ```typescript
 const ADDRESS = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266';
-const TOKEN = '0xF966020a30946A64B39E2e243049036367590858';
+const TOKEN = '0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb';
 
 const unwatchOutgoing = publicClient.watchContractEvent({
   address: TOKEN,
@@ -157,7 +142,7 @@ function stopWatching() {
 
 ```typescript
 const unwatch = publicClient.watchContractEvent({
-  address: '0xF966020a30946A64B39E2e243049036367590858',
+  address: '0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb',
   abi: erc20Abi,
   eventName: 'Approval',
   onLogs: (logs) => {
@@ -201,7 +186,7 @@ Use `watchEvent` for unfiltered logs from a contract address:
 
 ```typescript
 const unwatch = publicClient.watchEvent({
-  address: '0xF966020a30946A64B39E2e243049036367590858',
+  address: '0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb',
   onLogs: (logs) => {
     for (const log of logs) {
       console.log('Event:', log);
@@ -222,7 +207,7 @@ const transferEvent = parseAbiItem(
 );
 
 const logs = await publicClient.getLogs({
-  address: '0xF966020a30946A64B39E2e243049036367590858',
+  address: '0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb',
   event: transferEvent,
   fromBlock: 1000000n,
   toBlock: 1010000n,
@@ -245,7 +230,7 @@ for (const log of logs) {
 
 ```typescript
 const logs = await publicClient.getLogs({
-  address: '0xF966020a30946A64B39E2e243049036367590858',
+  address: '0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb',
   event: transferEvent,
   args: {
     from: '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266',
@@ -257,7 +242,7 @@ const logs = await publicClient.getLogs({
 
 ### Paginated log queries for large ranges
 
-Radius may restrict `eth_getLogs` to narrow block ranges. Paginate large queries by chunking:
+Radius **requires** an `address` filter on all `eth_getLogs` calls (error `-33014` without it). The block range is capped at 1,000,000 units (~16 min 40 sec due to ms-granularity block numbers; error `-33002` if exceeded). Paginate large queries by chunking:
 
 ```typescript
 async function getLogsPaginated(
@@ -323,7 +308,7 @@ async function getLogsPaginated(
 
 // Usage
 const logs = await getLogsPaginated(publicClient, {
-  address: '0xF966020a30946A64B39E2e243049036367590858',
+  address: '0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb',
   event: transferEvent,
   fromBlock: 0n,
   toBlock: 1000000n,
@@ -383,15 +368,18 @@ const wsClient = createPublicClient({
   transport: webSocket('wss://rpc.testnet.radiustech.xyz'),
 });
 
-// Real-time block subscription
-const unwatch = wsClient.watchBlockNumber({
-  onBlockNumber: (blockNumber) => {
-    console.log('Block (WebSocket):', blockNumber);
+// Real-time log subscription (the ONLY supported WebSocket subscription type)
+const unwatch = wsClient.watchContractEvent({
+  address: contractAddress,
+  abi: contractAbi,
+  eventName: 'Transfer',
+  onLogs: (logs) => {
+    // process logs
   },
 });
 ```
 
-> **Note:** WebSocket RPC on Radius requires an API key with elevated privileges. Only `logs` subscriptions are supported — `newHeads` and `newPendingTransactions` are not available. Contact [support@radiustech.xyz](mailto:support@radiustech.xyz) for access.
+> **Warning:** WebSocket RPC on Radius requires an API key with elevated privileges. **Only `logs` subscriptions are supported.** `newHeads`, `newPendingTransactions`, and `syncing` subscriptions return error `-32602`. `watchBlockNumber` via WebSocket will NOT work — use HTTP polling (`eth_blockNumber` on a 10-30 second interval) for block tracking instead. Poll-based filter methods (`eth_newFilter`, `eth_getFilterChanges`, etc.) are also unsupported. Contact [support@radiustech.xyz](mailto:support@radiustech.xyz) for WebSocket access.
 
 ### WebSocket with reconnection
 
@@ -431,7 +419,7 @@ const publicClient = createPublicClient({
 });
 
 const SERVICE_ADDRESS = '0x742d35Cc6634C0532925a3b844Bc9e7595f7E9F1';
-const TOKEN_ADDRESS = '0xF966020a30946A64B39E2e243049036367590858';
+const TOKEN_ADDRESS = '0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb';
 
 interface PaymentRecord {
   from: string;
