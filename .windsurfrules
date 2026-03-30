@@ -21,7 +21,7 @@ Use Radius when your application involves:
 
 | Network | Chain ID | RPC URL |
 |---------|----------|---------|
-| Mainnet | 723 | `https://rpc.radiustech.xyz` |
+| Mainnet | 723487 | `https://rpc.radiustech.xyz` |
 | Testnet | 72344 | `https://rpc.testnet.radiustech.xyz` |
 
 - Finality: ~500ms

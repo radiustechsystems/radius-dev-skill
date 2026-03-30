@@ -560,5 +560,5 @@ const results = await publicClient.multicall({
 |---------|-------|
 | **HTTP RPC** | `https://rpc.testnet.radiustech.xyz` |
 | **WebSocket RPC** | `wss://rpc.testnet.radiustech.xyz` (requires elevated access) |
-| **Chain ID** | `72344` (testnet) / `723` (mainnet) |
+| **Chain ID** | `72344` (testnet) / `723487` (mainnet) |
 | **Supported subscriptions** | `logs` only (`newHeads` and `newPendingTransactions` not available) |
