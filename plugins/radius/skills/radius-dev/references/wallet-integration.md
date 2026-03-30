@@ -76,28 +76,8 @@ pnpm add wagmi viem @tanstack/react-query
 ```typescript
 import { WagmiProvider, createConfig, http } from 'wagmi';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { defineChain } from 'viem';
 import { injected } from 'wagmi/connectors';
-
-// Define Radius Testnet (see typescript-viem.md for the full chain definition)
-const radiusTestnet = defineChain({
-  id: 72344,
-  name: 'Radius Testnet',
-  nativeCurrency: { decimals: 18, name: 'RUSD', symbol: 'RUSD' },
-  rpcUrls: { default: { http: ['https://rpc.testnet.radiustech.xyz'] } },
-  blockExplorers: {
-    default: { name: 'Radius Explorer', url: 'https://testnet.radiustech.xyz' },
-  },
-  fees: {
-    async estimateFeesPerGas() {
-      const res = await fetch(
-        'https://testnet.radiustech.xyz/api/v1/network/transaction-cost'
-      );
-      const { gas_price_wei } = await res.json();
-      return { gasPrice: BigInt(gas_price_wei) };
-    },
-  },
-});
+import { radiusTestnet } from './chain'; // See SKILL.md "Canonical chain definitions" to create this file
 
 const config = createConfig({
   chains: [radiusTestnet],
@@ -194,7 +174,7 @@ import { erc20Abi } from 'viem';
 
 function TokenBalance({ address }: { address: `0x${string}` }) {
   const { data: balance, isLoading } = useReadContract({
-    address: '0xF966020a30946A64B39E2e243049036367590858',
+    address: '0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb',
     abi: erc20Abi,
     functionName: 'balanceOf',
     args: [address],
@@ -210,7 +190,7 @@ function TokenBalance({ address }: { address: `0x${string}` }) {
 
 ```typescript
 import { useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
-import { erc20Abi, parseEther } from 'viem';
+import { erc20Abi, parseUnits } from 'viem';
 
 function TransferToken() {
   const { writeContract, data: hash, isPending } = useWriteContract();
@@ -218,10 +198,10 @@ function TransferToken() {
 
   const handleTransfer = () => {
     writeContract({
-      address: '0xF966020a30946A64B39E2e243049036367590858',
+      address: '0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb',
       abi: erc20Abi,
       functionName: 'transfer',
-      args: ['0x70997970C51812dc3A010C7d01b50e0d17dc79C8', parseEther('1')],
+      args: ['0x70997970C51812dc3A010C7d01b50e0d17dc79C8', parseUnits('1', 6)],
     });
   };
 
@@ -310,7 +290,7 @@ async function sendTransaction(walletClient, publicClient, address, to, amount) 
 Key differences from Ethereum that affect wallet integration:
 
 - **Stablecoin fees** — Gas is paid in stablecoins via the Turnstile mechanism. Users do not need to hold a separate gas token.
-- **Immediate finality** — Transactions finalize in the next block (~200ms). No need to wait for multiple confirmations.
+- **Immediate finality** — Transactions finalize sub-second (~200-500ms typical). No need to wait for multiple confirmations.
 - **Standard gas estimation** — Wallets estimate gas normally; Radius handles fee conversion behind the scenes.
 - **No reorgs** — Once confirmed, a transaction cannot be reversed by chain reorganization.
 
@@ -372,9 +352,8 @@ Full component with wallet connect and transaction sending:
 
 ```typescript
 import { useState } from 'react';
-import { createWalletClient, createPublicClient, custom, http, parseEther, defineChain } from 'viem';
-
-// Use the radiusTestnet chain definition from the wagmi section above
+import { createWalletClient, createPublicClient, custom, http, parseEther } from 'viem';
+import { radiusTestnet } from './chain'; // See SKILL.md "Canonical chain definitions" to create this file
 
 export default function WalletApp() {
   const [address, setAddress] = useState<string | null>(null);

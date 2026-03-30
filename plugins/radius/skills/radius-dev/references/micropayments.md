@@ -202,24 +202,8 @@ The server is the security boundary. It verifies on-chain payment, records it, a
 **POST `/api/content/verify-payment`** — Verify a new payment and return content:
 
 ```typescript
-import { createPublicClient, http, parseEther, defineChain } from 'viem';
-
-// Define Radius Testnet (see typescript-viem.md for the full chain definition)
-const radiusTestnet = defineChain({
-  id: 72344,
-  name: 'Radius Testnet',
-  nativeCurrency: { decimals: 18, name: 'RUSD', symbol: 'RUSD' },
-  rpcUrls: { default: { http: ['https://rpc.testnet.radiustech.xyz'] } },
-  fees: {
-    async estimateFeesPerGas() {
-      const res = await fetch(
-        'https://testnet.radiustech.xyz/api/v1/network/transaction-cost'
-      );
-      const { gas_price_wei } = await res.json();
-      return { gasPrice: BigInt(gas_price_wei) };
-    },
-  },
-});
+import { createPublicClient, http, parseEther } from 'viem';
+import { radiusTestnet } from './chain'; // See SKILL.md "Canonical chain definitions" to create this file
 
 const publicClient = createPublicClient({
   chain: radiusTestnet,
@@ -382,25 +366,8 @@ pnpm add wagmi viem @tanstack/react-query
 
 ```typescript
 import { WagmiProvider, createConfig, http } from 'wagmi';
-import { defineChain } from 'viem';
 import { injected } from 'wagmi/connectors';
-
-// Define Radius Testnet (see typescript-viem.md for the full chain definition)
-const radiusTestnet = defineChain({
-  id: 72344,
-  name: 'Radius Testnet',
-  nativeCurrency: { decimals: 18, name: 'RUSD', symbol: 'RUSD' },
-  rpcUrls: { default: { http: ['https://rpc.testnet.radiustech.xyz'] } },
-  fees: {
-    async estimateFeesPerGas() {
-      const res = await fetch(
-        'https://testnet.radiustech.xyz/api/v1/network/transaction-cost'
-      );
-      const { gas_price_wei } = await res.json();
-      return { gasPrice: BigInt(gas_price_wei) };
-    },
-  },
-});
+import { radiusTestnet } from './chain'; // See SKILL.md "Canonical chain definitions" to create this file
 
 const config = createConfig({
   chains: [radiusTestnet],
@@ -483,26 +450,10 @@ Create an Express.js API that charges per request:
 
 ```typescript
 import express, { Request, Response } from 'express';
-import { createPublicClient, createWalletClient, http, parseEther, isAddress, defineChain } from 'viem';
+import { createPublicClient, createWalletClient, http, parseEther, isAddress } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import type { Address, Hash } from 'viem';
-
-// Define Radius Testnet (see typescript-viem.md for the full chain definition)
-const radiusTestnet = defineChain({
-  id: 72344,
-  name: 'Radius Testnet',
-  nativeCurrency: { decimals: 18, name: 'RUSD', symbol: 'RUSD' },
-  rpcUrls: { default: { http: ['https://rpc.testnet.radiustech.xyz'] } },
-  fees: {
-    async estimateFeesPerGas() {
-      const res = await fetch(
-        'https://testnet.radiustech.xyz/api/v1/network/transaction-cost'
-      );
-      const { gas_price_wei } = await res.json();
-      return { gasPrice: BigInt(gas_price_wei) };
-    },
-  },
-});
+import { radiusTestnet } from './chain'; // See SKILL.md "Canonical chain definitions" to create this file
 
 // Server account (receives payments)
 const serverAccount = privateKeyToAccount(
@@ -810,25 +761,9 @@ This creates a natural "circuit breaker": if the client runs out of funds or the
 ### Client: payment stream loop
 
 ```typescript
-import { createPublicClient, createWalletClient, http, parseEther, defineChain } from 'viem';
+import { createPublicClient, createWalletClient, http, parseEther } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
-
-// Define Radius Testnet (see typescript-viem.md for the full chain definition)
-const radiusTestnet = defineChain({
-  id: 72344,
-  name: 'Radius Testnet',
-  nativeCurrency: { decimals: 18, name: 'RUSD', symbol: 'RUSD' },
-  rpcUrls: { default: { http: ['https://rpc.testnet.radiustech.xyz'] } },
-  fees: {
-    async estimateFeesPerGas() {
-      const res = await fetch(
-        'https://testnet.radiustech.xyz/api/v1/network/transaction-cost'
-      );
-      const { gas_price_wei } = await res.json();
-      return { gasPrice: BigInt(gas_price_wei) };
-    },
-  },
-});
+import { radiusTestnet } from './chain'; // See SKILL.md "Canonical chain definitions" to create this file
 
 const account = privateKeyToAccount(
   process.env.RADIUS_PRIVATE_KEY as `0x${string}`
@@ -1193,5 +1128,40 @@ setInterval(() => {
 | **RPC Endpoint** | `https://rpc.testnet.radiustech.xyz` |
 | **Chain ID** | `72344` |
 | **Native Token** | RUSD |
-| **Block time** | ~2-3 seconds |
+| **Finality** | Sub-second |
 | **Transaction cost** | ~0.0001 USD |
+
+## x402 Facilitator Network
+
+> For full x402 implementation details including request lifecycle, token compatibility (EIP-2612 permit + transferFrom),
+> validation steps, and inline facilitator patterns, fetch: `https://docs.radiustech.xyz/developer-resources/x402-integration.md`
+
+x402 is the HTTP-native payment protocol used for per-request API billing and micropayments. Facilitators handle on-chain settlement (permit + transferFrom) on behalf of clients.
+
+### Endorsed facilitators
+
+| Facilitator | URL | Networks | Protocol | Notes |
+|-------------|-----|----------|----------|-------|
+| Stablecoin.xyz | `https://x402.stablecoin.xyz` | Mainnet (723) + Testnet (72344) | v1 + v2 | Primary facilitator; absorbs gas costs |
+| FareSide | `https://facilitator.x402.rs` | Testnet only (72344) | v2 | Free for testing |
+| Middlebit | `https://middlebit.com` | Mainnet (723) | Routes via stablecoin.xyz | Multi-facilitator routing + analytics |
+
+### x402 v2 protocol summary
+
+v2 uses CAIP-2 network identifiers and standardized HTTP headers:
+
+- **CAIP-2 network IDs:** `eip155:723` (mainnet), `eip155:72344` (testnet)
+- **Request header:** `PAYMENT-SIGNATURE` — Base64-encoded signed payment
+- **402 response header:** `PAYMENT-REQUIRED` — Base64-encoded payment requirements
+- **200 response header:** `PAYMENT-RESPONSE` — Base64-encoded settlement result
+
+### Facilitator API endpoints
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/supported` | GET | Returns supported networks, schemes, and signer addresses |
+| `/verify` | POST | Validates payment signature without on-chain submission |
+| `/settle` | POST | Verifies and settles payment on Radius |
+| `/health` | GET | Facilitator status check |
+
+For full x402 integration details, fetch the live docs: `https://docs.radiustech.xyz/developer-resources/x402-integration.md`
