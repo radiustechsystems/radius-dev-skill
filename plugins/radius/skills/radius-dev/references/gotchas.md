@@ -50,7 +50,7 @@ Handle both error codes when switching fails:
 try {
   await provider.request({
     method: 'wallet_switchEthereumChain',
-    params: [{ chainId: '0x2D3' }], // 723 mainnet
+    params: [{ chainId: '0xB0A1F' }], // 723487 mainnet
   });
 } catch (switchError) {
   const code = switchError.code ?? switchError.data?.originalError?.code;
@@ -59,7 +59,7 @@ try {
     await provider.request({
       method: 'wallet_addEthereumChain',
       params: [{
-        chainId: '0x2D3',
+        chainId: '0xB0A1F',
         chainName: 'Radius Network',
         nativeCurrency: { name: 'RUSD', symbol: 'RUSD', decimals: 18 },
         rpcUrls: ['https://rpc.radiustech.xyz'],
@@ -78,9 +78,9 @@ Show unsupported wallets as "Coming Soon" rather than letting users hit confusin
 
 Different wallets return `eth_chainId` in different formats:
 
-- MetaMask: hex string `"0x2D3"`
-- Some wallets: decimal string `"723"`
-- Some wallets: number `723`
+- MetaMask: hex string `"0xB0A1F"`
+- Some wallets: decimal string `"723487"`
+- Some wallets: number `723487`
 
 Always normalize before comparing:
 
@@ -184,7 +184,7 @@ The Stable Coin token uses EIP-2612 permits. The EIP-712 domain must match what 
 const domain = {
   name: 'Stable Coin',          // NOT "SBC", NOT "Radius SBC"
   version: '1',         // String "1", not number 1
-  chainId: 723,         // Actual chain ID as a number
+  chainId: 723487,      // Actual chain ID as a number
   verifyingContract: '0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb',
 };
 ```
@@ -419,6 +419,19 @@ Implications:
 
 ---
 
+## 22. Chain ID migration (723 → 723487)
+
+The Radius mainnet chain ID changed from `723` (`0x2D3`) to `723487` (`0xB0A1F`). The testnet chain ID (`72344`) is unchanged. This affects several areas:
+
+- **EIP-712 signatures:** Off-chain typed-data signatures (EIP-2612 permits, meta-transactions) signed with `chainId: 723` will not verify post-migration. DApps must re-request signatures from users.
+- **Wallet configurations:** Users who added Radius to MetaMask with chain ID `723` need to remove and re-add the network with `723487` (`0xB0A1F`).
+- **Hardcoded chain IDs:** Any application logic that hardcodes `723`, `0x2D3`, or `"723"` for chain detection or switching must be updated.
+- **Transaction history:** On-chain transactions confirmed before migration remain valid — finalized state is unaffected. Block explorers and indexers may need re-indexing.
+
+Best practice: read chain ID dynamically from the connected provider rather than hardcoding it.
+
+---
+
 ## Quick reference: environment variables
 
 | Variable | Required | Description |
@@ -427,4 +440,4 @@ Implications:
 | `SETTLEMENT_PRIVATE_KEY` | Yes (x402) | Private key for the settlement wallet (needs RUSD for gas) |
 | `SBC_ASSET` | No | SBC token address (default: `0x33ad...14fb`) |
 | `PAYMENT_ADDRESS` | No | Token recipient address |
-| `NETWORK_CHAIN_ID` | No | Chain ID (default: 723 for mainnet, 72344 for testnet) |
+| `NETWORK_CHAIN_ID` | No | Chain ID (default: 723487 for mainnet, 72344 for testnet) |

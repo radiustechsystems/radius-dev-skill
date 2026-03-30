@@ -46,7 +46,7 @@ Use this Skill when the user asks for:
 
 | Setting | Testnet | Mainnet |
 |---------|---------|---------|
-| Chain ID | `72344` | `723` |
+| Chain ID | `72344` | `723487` |
 | RPC | `https://rpc.testnet.radiustech.xyz` | `https://rpc.radiustech.xyz` |
 | Native currency | RUSD (18 decimals) | RUSD (18 decimals) |
 | SBC token (ERC-20) | `0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb` (6 decimals) | `0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb` (6 decimals) |
@@ -101,7 +101,7 @@ export const radiusTestnet = defineChain({
 });
 
 export const radiusMainnet = defineChain({
-  id: 723,
+  id: 723487,
   name: 'Radius Network',
   nativeCurrency: { decimals: 18, name: 'RUSD', symbol: 'RUSD' },
   rpcUrls: { default: { http: ['https://rpc.radiustech.xyz'] } },

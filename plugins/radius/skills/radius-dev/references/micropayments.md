@@ -1142,15 +1142,15 @@ x402 is the HTTP-native payment protocol used for per-request API billing and mi
 
 | Facilitator | URL | Networks | Protocol | Notes |
 |-------------|-----|----------|----------|-------|
-| Stablecoin.xyz | `https://x402.stablecoin.xyz` | Mainnet (723) + Testnet (72344) | v1 + v2 | Primary facilitator; absorbs gas costs |
+| Stablecoin.xyz | `https://x402.stablecoin.xyz` | Mainnet (723487) + Testnet (72344) | v1 + v2 | Primary facilitator; absorbs gas costs |
 | FareSide | `https://facilitator.x402.rs` | Testnet only (72344) | v2 | Free for testing |
-| Middlebit | `https://middlebit.com` | Mainnet (723) | Routes via stablecoin.xyz | Multi-facilitator routing + analytics |
+| Middlebit | `https://middlebit.com` | Mainnet (723487) | Routes via stablecoin.xyz | Multi-facilitator routing + analytics |
 
 ### x402 v2 protocol summary
 
 v2 uses CAIP-2 network identifiers and standardized HTTP headers:
 
-- **CAIP-2 network IDs:** `eip155:723` (mainnet), `eip155:72344` (testnet)
+- **CAIP-2 network IDs:** `eip155:723487` (mainnet), `eip155:72344` (testnet)
 - **Request header:** `PAYMENT-SIGNATURE` — Base64-encoded signed payment
 - **402 response header:** `PAYMENT-REQUIRED` — Base64-encoded payment requirements
 - **200 response header:** `PAYMENT-RESPONSE` — Base64-encoded settlement result

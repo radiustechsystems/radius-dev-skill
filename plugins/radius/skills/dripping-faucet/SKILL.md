@@ -31,7 +31,7 @@ When the mainnet URL becomes available, the same flow applies — only the base 
 
 | Property | Testnet | Mainnet |
 |----------|---------|---------|
-| Chain ID | `72344` | `723` |
+| Chain ID | `72344` | `723487` |
 | RPC URL | `https://rpc.testnet.radiustech.xyz` | `https://rpc.radiustech.xyz` |
 | Native Currency | RUSD (18 decimals) | RUSD (18 decimals) |
 | SBC Contract | `0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb` | `0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb` |

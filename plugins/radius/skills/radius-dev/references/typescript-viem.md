@@ -44,7 +44,7 @@ export const radiusTestnet = defineChain({
 });
 
 export const radiusMainnet = defineChain({
-  id: 723,
+  id: 723487,
   name: 'Radius Network',
   nativeCurrency: { decimals: 18, name: 'RUSD', symbol: 'RUSD' },
   rpcUrls: {
@@ -569,7 +569,7 @@ const result = await publicClient.request({
 | Setting | Testnet | Mainnet |
 |---------|---------|---------|
 | **RPC Endpoint** | `https://rpc.testnet.radiustech.xyz` | `https://rpc.radiustech.xyz` |
-| **Chain ID** | `72344` | `723` |
+| **Chain ID** | `72344` | `723487` |
 | **Native Token** | RUSD (18 decimals) | RUSD (18 decimals) |
 | **SBC Token** | `0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb` (6 decimals) | `0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb` (6 decimals) |
 | **Block Explorer** | `https://testnet.radiustech.xyz` | `https://network.radiustech.xyz` |
