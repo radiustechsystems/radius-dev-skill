@@ -7,7 +7,7 @@ Complete endpoint specifications for Radius Network faucet APIs.
 | Network | Base URL |
 |---------|----------|
 | Testnet | `https://testnet.radiustech.xyz/api/v1/faucet` |
-| Mainnet | `https://dashboard.radiustech.xyz/api/v1/faucet` |
+| Mainnet | `https://network.radiustech.xyz/api/v1/faucet` |
 
 All endpoints return `Content-Type: application/json`.
 
@@ -26,7 +26,7 @@ All endpoints return `Content-Type: application/json`.
 | Setting | Value |
 |---------|-------|
 | Drip amount | ~0.01 SBC per request |
-| Rate limit | 1 requests per 24 hour window |
+| Rate limit | 1 requests per 24-hour window |
 | Signature required | **Yes** |
 
 ### Configuration Reminder

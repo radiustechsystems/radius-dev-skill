@@ -6,9 +6,9 @@
     "expected_behavior": [
         "Identifies the target network as mainnet from the user's prompt before doing anything else",
         "Does NOT silently default to testnet — the user explicitly said 'mainnet'",
-        "Uses the mainnet faucet URL: https://dashboard.radiustech.xyz/api/v1/faucet",
+        "Uses the mainnet faucet URL: https://network.radiustech.xyz/api/v1/faucet",
         "Confirms wallet ownership and key access before making any faucet request — on mainnet, unsigned flow will always fail, so asking for the key upfront avoids a wasted request",
-        "If the user has no key/keystore, stops immediately and directs them to the mainnet web faucet (https://dashboard.radiustech.xyz/wallet) instead of making a doomed unsigned attempt",
+        "If the user has no key/keystore, stops immediately and directs them to the mainnet web faucet (https://network.radiustech.xyz/wallet) instead of making a doomed unsigned attempt",
         "Validates the wallet address with isAddress() or regex before sending any request",
         "Attempts POST /drip without a signature first (acceptable), or skips straight to the signed flow as an optimisation",
         "When /drip returns signature_required (as expected on mainnet): falls back to signed flow",
@@ -24,7 +24,7 @@
     ],
     "success_criteria": [
         "Network is identified as mainnet before any faucet request is made",
-        "Mainnet faucet URL (https://dashboard.radiustech.xyz/api/v1/faucet) is used — testnet URL is never called",
+        "Mainnet faucet URL (https://network.radiustech.xyz/api/v1/faucet) is used — testnet URL is never called",
         "If the user has no private key/keystore, the agent stops and reports immediately without attempting the drip",
         "Unsigned drip attempt, if made, is followed by the signed flow when signature_required is returned — it is not treated as a terminal error",
         "Signed flow is completed: challenge is fetched, message field is extracted and signed, POST /drip is retried with the signature",

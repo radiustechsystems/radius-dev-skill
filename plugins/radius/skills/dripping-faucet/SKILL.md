@@ -43,7 +43,7 @@ Determine the target network **before** doing anything else — it controls the 
 | Network | URL | Notes |
 |---------|-----|-------|
 | Testnet | `https://testnet.radiustech.xyz/api/v1/faucet` | Signatures not currently required. ~0.5 SBC per drip. 60 requests/min. |
-| Mainnet | `https://dashboard.radiustech.xyz/api/v1/faucet` | Signatures **always** required. ~0.01 SBC per drip. 1 request/day. |
+| Mainnet | `https://network.radiustech.xyz/api/v1/faucet` | Signatures **always** required. ~0.01 SBC per drip. 1 request/day. |
 
 > **Signatures can be re-enabled on testnet at any time.** Always handle a `signature_required` error from `/drip` by falling back to the signed flow. Never assume unsigned will work permanently.
 
@@ -56,7 +56,7 @@ Determine the target network **before** doing anything else — it controls the 
 | Native Currency | RUSD (18 decimals) | RUSD (18 decimals) |
 | SBC Contract | `0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb` | `0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb` |
 | SBC Decimals | **6** (not 18) | **6** (not 18) |
-| Web faucet | `https://testnet.radiustech.xyz/wallet` | `https://dashboard.radiustech.xyz/wallet` |
+| Web faucet | `https://testnet.radiustech.xyz/wallet` | `https://network.radiustech.xyz/wallet` |
 
 SBC uses **6 decimals**. Always `parseUnits(amount, 6)` / `formatUnits(balance, 6)`.
 
@@ -90,7 +90,7 @@ Before calling the faucet, determine the wallet situation. This decides which fl
 | We created the wallet | ✅ | ✅ | Full flow available |
 | User's wallet, we have the key/keystore | ✅ | ✅ | Full flow available |
 | User's wallet, we do NOT have the key — **Testnet** | ✅ | ❌ | Unsigned only — if `signature_required`, ask the user to provide the key or use the [testnet web faucet](https://testnet.radiustech.xyz/wallet) |
-| User's wallet, we do NOT have the key — **Mainnet** | ⚠️ | ❌ | Unsigned will almost certainly fail (`signature_required`). Ask for the key upfront, or direct the user to the [mainnet web faucet](https://dashboard.radiustech.xyz/wallet) before attempting anything. |
+| User's wallet, we do NOT have the key — **Mainnet** | ⚠️ | ❌ | Unsigned will almost certainly fail (`signature_required`). Ask for the key upfront, or direct the user to the [mainnet web faucet](https://network.radiustech.xyz/wallet) before attempting anything. |
 
 **Key rule:** never attempt the signed flow without confirmed access to the private key. On mainnet, if you only have an address, proactively tell the user that a signature will be required and ask for the key before making any requests.
 
@@ -114,7 +114,7 @@ Before calling the faucet, determine the wallet situation. This decides which fl
 
 On testnet today, step 1 succeeds without a signature. But always implement the full flow — signatures can be re-enabled at any time.
 
-**On mainnet, step 1 will always return `signature_required`.** If you already know the target network is mainnet and you have the key, you may skip straight to the signed flow to avoid the extra round-trip. If you don't have the key, stop immediately and direct the user to the [mainnet web faucet](https://dashboard.radiustech.xyz/wallet).
+**On mainnet, step 1 will always return `signature_required`.** If you already know the target network is mainnet and you have the key, you may skip straight to the signed flow to avoid the extra round-trip. If you don't have the key, stop immediately and direct the user to the [mainnet web faucet](https://network.radiustech.xyz/wallet).
 
 ### Agent execution note
 
@@ -150,14 +150,14 @@ const NETWORK_CONFIG: Record<Network, { faucetUrl: string; chain: Chain }> = {
     }),
   },
   mainnet: {
-    faucetUrl: 'https://dashboard.radiustech.xyz/api/v1/faucet',
+    faucetUrl: 'https://network.radiustech.xyz/api/v1/faucet',
     chain: defineChain({
       id: 723487,
       name: 'Radius Mainnet',
       nativeCurrency: { decimals: 18, name: 'RUSD', symbol: 'RUSD' },
       rpcUrls: { default: { http: ['https://rpc.radiustech.xyz'] } },
       blockExplorers: {
-        default: { name: 'Radius Explorer', url: 'https://dashboard.radiustech.xyz' },
+        default: { name: 'Radius Explorer', url: 'https://network.radiustech.xyz' },
       },
       fees: radiusFees,
     }),
@@ -332,9 +332,9 @@ set -euo pipefail
 NETWORK="${NETWORK:-testnet}"
 
 if [ "$NETWORK" = "mainnet" ]; then
-  FAUCET_URL="https://dashboard.radiustech.xyz/api/v1/faucet"
+  FAUCET_URL="https://network.radiustech.xyz/api/v1/faucet"
   RPC_URL="https://rpc.radiustech.xyz"
-  WEB_FAUCET="https://dashboard.radiustech.xyz/wallet"
+  WEB_FAUCET="https://network.radiustech.xyz/wallet"
 else
   FAUCET_URL="https://testnet.radiustech.xyz/api/v1/faucet"
   RPC_URL="https://rpc.testnet.radiustech.xyz"
@@ -442,7 +442,7 @@ NETWORK="${NETWORK:-testnet}"
 if [ "$NETWORK" = "mainnet" ]; then
   echo "ERROR: address-only (unsigned) flow cannot be used on mainnet."
   echo "Mainnet always requires a signature. Provide the private key/keystore, or use:"
-  echo "  https://dashboard.radiustech.xyz/wallet"
+  echo "  https://network.radiustech.xyz/wallet"
   exit 1
 fi
 
