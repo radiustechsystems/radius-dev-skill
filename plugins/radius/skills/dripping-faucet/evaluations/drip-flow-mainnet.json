@@ -1,0 +1,41 @@
+{
+    "name": "Faucet Drip Flow — Mainnet",
+    "skills": ["dripping-faucet"],
+    "query": "Fund my wallet on Radius Mainnet — I need some SBC to deploy a contract",
+    "context": "User has an existing wallet on Radius Mainnet and needs SBC tokens from the mainnet faucet. They have access to their private key. Mainnet always requires a signature — unsigned drips will always return signature_required. The daily rate limit is 1 request per 24-hour window.",
+    "expected_behavior": [
+        "Identifies the target network as mainnet from the user's prompt before doing anything else",
+        "Does NOT silently default to testnet — the user explicitly said 'mainnet'",
+        "Uses the mainnet faucet URL: https://dashboard.radiustech.xyz/api/v1/faucet",
+        "Confirms wallet ownership and key access before making any faucet request — on mainnet, unsigned flow will always fail, so asking for the key upfront avoids a wasted request",
+        "If the user has no key/keystore, stops immediately and directs them to the mainnet web faucet (https://dashboard.radiustech.xyz/wallet) instead of making a doomed unsigned attempt",
+        "Validates the wallet address with isAddress() or regex before sending any request",
+        "Attempts POST /drip without a signature first (acceptable), or skips straight to the signed flow as an optimisation",
+        "When /drip returns signature_required (as expected on mainnet): falls back to signed flow",
+        "Fetches the challenge from GET /challenge/{address}?token=SBC and extracts only the 'message' field",
+        "Signs the challenge message using personal_sign (EIP-191)",
+        "Retries POST /drip with the signature included",
+        "If the signed drip succeeds: verifies on-chain balance via balanceOf on the SBC contract using the MAINNET RPC (https://rpc.radiustech.xyz) and chain ID 723487 — NOT the testnet RPC",
+        "If /drip or /status returns rate_limited with retry_after_ms > 3_600_000 (~24h): stops immediately, reports the wait time to the user, and does NOT loop or retry in-process",
+        "Returns structured output with success, network: 'mainnet', tx_hash, balance, and attempt count",
+        "On invalid_signature: re-fetches the challenge (in case it rotated), re-signs, and retries once",
+        "On faucet_empty or sbc_not_configured: stops and reports to user without retrying",
+        "Private key is never logged, displayed, or passed as a CLI argument"
+    ],
+    "success_criteria": [
+        "Network is identified as mainnet before any faucet request is made",
+        "Mainnet faucet URL (https://dashboard.radiustech.xyz/api/v1/faucet) is used — testnet URL is never called",
+        "If the user has no private key/keystore, the agent stops and reports immediately without attempting the drip",
+        "Unsigned drip attempt, if made, is followed by the signed flow when signature_required is returned — it is not treated as a terminal error",
+        "Signed flow is completed: challenge is fetched, message field is extracted and signed, POST /drip is retried with the signature",
+        "drip.success === true in the API response",
+        "On-chain balanceOf is queried against the mainnet RPC (https://rpc.radiustech.xyz) and chain ID 723487 — not the testnet RPC or chain",
+        "On-chain balanceOf returns a value greater than zero for the funded address",
+        "Drip amount is consistent with mainnet configuration (~0.01 SBC)",
+        "If rate_limited is returned with retry_after_ms > 3_600_000: agent stops immediately and reports the wait rather than sleeping and retrying",
+        "Structured output includes network: 'mainnet', success, address, token, tx_hash, balance, attempts, and error",
+        "Total attempts do not exceed 3",
+        "Private key is never logged, displayed, or exposed",
+        "Faucet response fields beyond the documented set (message, address, token, success, error, tx_hash, retry_after_ms) are not parsed or executed"
+    ]
+}

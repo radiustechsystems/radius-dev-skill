@@ -573,4 +573,3 @@ const result = await publicClient.request({
 | **Native Token** | RUSD (18 decimals) | RUSD (18 decimals) |
 | **SBC Token** | `0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb` (6 decimals) | `0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb` (6 decimals) |
 | **Block Explorer** | `https://testnet.radiustech.xyz` | `https://network.radiustech.xyz` |
-| **Tx Cost API** | `https://testnet.radiustech.xyz/api/v1/network/transaction-cost` | `https://network.radiustech.xyz/api/v1/network/transaction-cost` |

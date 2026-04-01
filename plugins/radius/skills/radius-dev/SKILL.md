@@ -52,8 +52,7 @@ Use this Skill when the user asks for:
 | SBC token (ERC-20) | `0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb` (6 decimals) | `0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb` (6 decimals) |
 | Explorer | `https://testnet.radiustech.xyz` | `https://network.radiustech.xyz` |
 | Faucet (for humans) | `https://testnet.radiustech.xyz/wallet` | `https://network.radiustech.xyz/wallet` |
-| Faucet (for agents) | See **dripping-faucet** skill | Coming Soon |
-| Transaction cost API | `https://testnet.radiustech.xyz/api/v1/network/transaction-cost` | `https://network.radiustech.xyz/api/v1/network/transaction-cost` |
+| Faucet (for agents) | See **dripping-faucet** skill | See **dripping-faucet** skill |
 | API rate limit | — | 10 MGas/s per API key |
 | API key format | — | Append to RPC URL: `https://rpc.radiustech.xyz/YOUR_API_KEY` |
 

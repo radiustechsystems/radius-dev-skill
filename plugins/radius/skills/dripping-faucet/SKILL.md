@@ -2,30 +2,50 @@
 name: dripping-faucet
 description: |
   Request testnet or mainnet tokens from a Radius Network faucet. Use when the user says
-  "fund my wallet", "get testnet tokens", "drip SBC", "use the faucet", "get test funds",
-  or needs tokens on Radius to start developing or testing.
+  "fund my wallet", "get testnet tokens", "get mainnet tokens", "drip SBC", "use the faucet",
+  "get test funds", "fund my wallet on mainnet", "get SBC on mainnet", or needs tokens on
+  Radius Testnet or Mainnet to start developing or testing.
 ---
 
 # Dripping Faucet
 
-Request tokens from a Radius Network faucet. Handles unsigned and signed drip requests, with on-chain balance verification.
+Request tokens from a Radius Network faucet. Handles unsigned and signed drip requests, with on-chain balance verification, for both Testnet and Mainnet.
 
 ## When to Use
 
 - User needs SBC tokens on Radius Testnet or Mainnet
 - User wants to fund a new or existing wallet from the faucet
 - User asks how to get test funds on Radius
+- User mentions "mainnet faucet", "mainnet tokens", or "fund on mainnet"
+
+## Network Selection
+
+Determine the target network **before** doing anything else — it controls the faucet URL, the RPC endpoint, the chain ID, and the expected behaviour.
+
+**Ask in order:**
+
+1. **Did the user explicitly name a network?**
+   - "testnet" / "test" / "dev" / "staging" → use **Testnet**
+   - "mainnet" / "production" / "live" → use **Mainnet**
+   - Ambiguous (e.g. "fund my wallet", "get some SBC") → **ask the user** before proceeding.
+
+2. **Default: never silently pick mainnet.** Mainnet drips are rate-limited to 1/day and always require a signature. An accidental mainnet request wastes the user's daily quota and cannot easily be undone. When in doubt, confirm.
+
+| Situation | Network |
+|-----------|---------|
+| User says "testnet", "test", "dev" | Testnet |
+| User says "mainnet", "production", "live" | Mainnet |
+| User says "Radius" with no qualifier | **Ask** |
+| User says "get test funds" / "start testing" | Testnet (implied) |
 
 ## Faucet URLs
 
 | Network | URL | Notes |
 |---------|-----|-------|
 | Testnet | `https://testnet.radiustech.xyz/api/v1/faucet` | Signatures not currently required. ~0.5 SBC per drip. 60 requests/min. |
-| Mainnet | TBD | Additional restrictions expected (stricter rate limits, signatures likely required, possible allowlisting). |
+| Mainnet | `https://dashboard.radiustech.xyz/api/v1/faucet` | Signatures **always** required. ~0.01 SBC per drip. 1 request/day. |
 
 > **Signatures can be re-enabled on testnet at any time.** Always handle a `signature_required` error from `/drip` by falling back to the signed flow. Never assume unsigned will work permanently.
-
-When the mainnet URL becomes available, the same flow applies — only the base URL and any extra auth requirements change.
 
 ## Chain Configuration
 
@@ -36,7 +56,7 @@ When the mainnet URL becomes available, the same flow applies — only the base 
 | Native Currency | RUSD (18 decimals) | RUSD (18 decimals) |
 | SBC Contract | `0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb` | `0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb` |
 | SBC Decimals | **6** (not 18) | **6** (not 18) |
-| Tx Cost API | `https://testnet.radiustech.xyz/api/v1/network/transaction-cost` | `https://network.radiustech.xyz/api/v1/network/transaction-cost` |
+| Web faucet | `https://testnet.radiustech.xyz/wallet` | `https://dashboard.radiustech.xyz/wallet` |
 
 SBC uses **6 decimals**. Always `parseUnits(amount, 6)` / `formatUnits(balance, 6)`.
 
@@ -69,9 +89,10 @@ Before calling the faucet, determine the wallet situation. This decides which fl
 |-----------|:---:|:---:|---|
 | We created the wallet | ✅ | ✅ | Full flow available |
 | User's wallet, we have the key/keystore | ✅ | ✅ | Full flow available |
-| User's wallet, we do NOT have the key | ✅ | ❌ | Unsigned only — if `signature_required`, report back and ask the user to provide the key or use the [web faucet](https://testnet.radiustech.xyz/testnet/faucet) |
+| User's wallet, we do NOT have the key — **Testnet** | ✅ | ❌ | Unsigned only — if `signature_required`, ask the user to provide the key or use the [testnet web faucet](https://testnet.radiustech.xyz/wallet) |
+| User's wallet, we do NOT have the key — **Mainnet** | ⚠️ | ❌ | Unsigned will almost certainly fail (`signature_required`). Ask for the key upfront, or direct the user to the [mainnet web faucet](https://dashboard.radiustech.xyz/wallet) before attempting anything. |
 
-**Key rule:** never attempt the signed flow without confirmed access to the private key. If you only have an address, try the unsigned drip and be prepared to fail gracefully.
+**Key rule:** never attempt the signed flow without confirmed access to the private key. On mainnet, if you only have an address, proactively tell the user that a signature will be required and ask for the key before making any requests.
 
 ## Flow Overview
 
@@ -81,7 +102,7 @@ Before calling the faucet, determine the wallet situation. This decides which fl
    → signature_required?  →  continue to signed flow
    → rate_limited?  →  wait retry_after_ms, then retry
 
-2. Signed flow (only if step 1 returns signature_required):
+2. Signed flow (only if step 1 returns signature_required, OR when targeting mainnet and we know a signature is required):
    a. Check status  →  rate_limited?  →  wait, then retry
    b. Get challenge  →  extract "message" field only
    c. Sign challenge (EIP-191 personal_sign)
@@ -91,7 +112,9 @@ Before calling the faucet, determine the wallet situation. This decides which fl
         → no:  check error code  →  adapt and retry (max 2 retries)
 ```
 
-On testnet today, step 1 succeeds without a signature. But always implement the full flow — signatures can be re-enabled at any time, and mainnet will likely require them.
+On testnet today, step 1 succeeds without a signature. But always implement the full flow — signatures can be re-enabled at any time.
+
+**On mainnet, step 1 will always return `signature_required`.** If you already know the target network is mainnet and you have the key, you may skip straight to the signed flow to avoid the extra round-trip. If you don't have the key, stop immediately and direct the user to the [mainnet web faucet](https://dashboard.radiustech.xyz/wallet).
 
 ### Agent execution note
 
@@ -109,8 +132,38 @@ import { defineChain, createPublicClient, http, erc20Abi, isAddress, formatUnits
 import type { Chain, Client } from 'viem';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 
-// --- Configuration ---
-const FAUCET_URL = 'https://testnet.radiustech.xyz/api/v1/faucet';
+// --- Network configuration ---
+type Network = 'testnet' | 'mainnet';
+
+const NETWORK_CONFIG: Record<Network, { faucetUrl: string; chain: Chain }> = {
+  testnet: {
+    faucetUrl: 'https://testnet.radiustech.xyz/api/v1/faucet',
+    chain: defineChain({
+      id: 72344,
+      name: 'Radius Testnet',
+      nativeCurrency: { decimals: 18, name: 'RUSD', symbol: 'RUSD' },
+      rpcUrls: { default: { http: ['https://rpc.testnet.radiustech.xyz'] } },
+      blockExplorers: {
+        default: { name: 'Radius Testnet Explorer', url: 'https://testnet.radiustech.xyz' },
+      },
+      fees: radiusFees,
+    }),
+  },
+  mainnet: {
+    faucetUrl: 'https://dashboard.radiustech.xyz/api/v1/faucet',
+    chain: defineChain({
+      id: 723487,
+      name: 'Radius Mainnet',
+      nativeCurrency: { decimals: 18, name: 'RUSD', symbol: 'RUSD' },
+      rpcUrls: { default: { http: ['https://rpc.radiustech.xyz'] } },
+      blockExplorers: {
+        default: { name: 'Radius Explorer', url: 'https://dashboard.radiustech.xyz' },
+      },
+      fees: radiusFees,
+    }),
+  },
+};
+
 const SBC_CONTRACT = '0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb' as const;
 const SBC_DECIMALS = 6;
 
@@ -122,25 +175,14 @@ const radiusFees = {
   },
 } satisfies Chain['fees'];
 
-const radiusTestnet = defineChain({
-  id: 72344,
-  name: 'Radius Testnet',
-  nativeCurrency: { decimals: 18, name: 'RUSD', symbol: 'RUSD' },
-  rpcUrls: { default: { http: ['https://rpc.testnet.radiustech.xyz'] } },
-  blockExplorers: {
-    default: { name: 'Radius Testnet Explorer', url: 'https://testnet.radiustech.xyz' },
-  },
-  fees: radiusFees,
-});
-
 // --- Wallet setup ---
 // Option A: We have an existing key (user's wallet, stored in .env)
 // const privateKey = process.env.PRIVATE_KEY as `0x${string}`;
 
-// Option B: We only have an address (no key — unsigned flow only)
+// Option B: We only have an address (no key — unsigned flow only; mainnet will always fail)
 // const addressOnly = '0x...' as `0x${string}`;
 
-// Option C: Create a new throwaway testnet wallet (we own the key)
+// Option C: Create a new throwaway wallet (we own the key — valid for testnet only)
 const privateKey = generatePrivateKey();
 const account = privateKeyToAccount(privateKey);
 // SECURITY: only log the address, never the key
@@ -154,15 +196,30 @@ async function dripWithRetry(
   address: string,
   /** Pass null if we don't have the private key — signed fallback will be skipped. */
   signer: { signMessage: (args: { message: string }) => Promise<string> } | null,
+  network: Network = 'testnet',
   maxAttempts = 3
-): Promise<{ success: boolean; tx_hash?: string; balance?: string; error?: string }> {
+): Promise<{ success: boolean; network: Network; tx_hash?: string; balance?: string; error?: string }> {
   if (!isAddress(address)) {
-    return { success: false, error: `Invalid address: ${address}` };
+    return { success: false, network, error: `Invalid address: ${address}` };
+  }
+
+  const { faucetUrl, chain } = NETWORK_CONFIG[network];
+
+  // On mainnet, signature is always required. If we have no signer, fail fast
+  // rather than wasting the user's 1-per-day quota on a request that will be rejected.
+  if (network === 'mainnet' && !signer) {
+    return {
+      success: false,
+      network,
+      error: 'mainnet_signature_required_but_no_key',
+    };
   }
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    // 1. Try unsigned drip first
-    const dripRes = await fetch(`${FAUCET_URL}/drip`, {
+    // 1. Try unsigned drip first (skipping straight to signed flow on mainnet is an
+    //    optimisation you may apply, but the unsigned attempt is safe to make here
+    //    since the signed fallback is implemented below).
+    const dripRes = await fetch(`${faucetUrl}/drip`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ address, token: 'SBC' }),
@@ -174,23 +231,28 @@ async function dripWithRetry(
       if (!signer) {
         return {
           success: false,
+          network,
           error: 'signature_required_but_no_key',
         };
       }
       console.log('Signature required — switching to signed flow');
 
       // Check status
-      const statusRes = await fetch(`${FAUCET_URL}/status/${address}?token=SBC`);
+      const statusRes = await fetch(`${faucetUrl}/status/${address}?token=SBC`);
       const status = await statusRes.json();
       if (status.rate_limited) {
         const waitMs = status.retry_after_ms ?? 60_000;
         console.log(`Rate limited. Waiting ${waitMs}ms (attempt ${attempt}/${maxAttempts})`);
+        // On mainnet, retry_after_ms can be ~86_400_000 (24 hours). Do not loop — report to user.
+        if (waitMs > 3_600_000) {
+          return { success: false, network, error: `rate_limited_long_wait_ms:${waitMs}` };
+        }
         await new Promise((r) => setTimeout(r, waitMs));
         continue;
       }
 
       // Get challenge — extract only the "message" field
-      const challengeRes = await fetch(`${FAUCET_URL}/challenge/${address}?token=SBC`);
+      const challengeRes = await fetch(`${faucetUrl}/challenge/${address}?token=SBC`);
       const challenge = await challengeRes.json();
       const message: string = challenge.message;
 
@@ -198,7 +260,7 @@ async function dripWithRetry(
       const signature = await signer.signMessage({ message });
 
       // Retry drip with signature
-      const signedRes = await fetch(`${FAUCET_URL}/drip`, {
+      const signedRes = await fetch(`${faucetUrl}/drip`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ address, token: 'SBC', signature }),
@@ -209,7 +271,7 @@ async function dripWithRetry(
     // 3. Evaluate
     if (drip.success) {
       // Verify on-chain (the receipt is ground truth, not the API response)
-      const publicClient = createPublicClient({ chain: radiusTestnet, transport: http() });
+      const publicClient = createPublicClient({ chain, transport: http() });
       const balance = await publicClient.readContract({
         address: SBC_CONTRACT,
         abi: erc20Abi,
@@ -217,8 +279,8 @@ async function dripWithRetry(
         args: [address as `0x${string}`],
       });
       const formatted = formatUnits(balance, SBC_DECIMALS);
-      console.log(`SBC balance: ${formatted}`);
-      return { success: true, tx_hash: drip.tx_hash, balance: formatted };
+      console.log(`SBC balance (${network}): ${formatted}`);
+      return { success: true, network, tx_hash: drip.tx_hash, balance: formatted };
     }
 
     // Critique: map error to action
@@ -226,6 +288,10 @@ async function dripWithRetry(
 
     if (drip.error === 'rate_limited') {
       const waitMs = drip.retry_after_ms ?? 60_000;
+      // On mainnet, a rate_limited response means ~24h. Stop immediately.
+      if (waitMs > 3_600_000) {
+        return { success: false, network, error: `rate_limited_long_wait_ms:${waitMs}` };
+      }
       await new Promise((r) => setTimeout(r, waitMs));
       continue;
     }
@@ -234,16 +300,26 @@ async function dripWithRetry(
       continue;
     }
     if (['faucet_empty', 'sbc_not_configured', 'internal_error'].includes(drip.error)) {
-      return { success: false, error: drip.error };
+      return { success: false, network, error: drip.error };
     }
   }
 
-  return { success: false, error: 'max_attempts_exceeded' };
+  return { success: false, network, error: 'max_attempts_exceeded' };
 }
 
-const result = await dripWithRetry(account.address, account);
-// If you only have an address and no key, call: dripWithRetry(addressOnly, null);
-console.log('Result:', JSON.stringify(result, null, 2));
+// Testnet — create a throwaway wallet, no signature needed today
+const testnetResult = await dripWithRetry(account.address, account, 'testnet');
+console.log('Testnet result:', JSON.stringify(testnetResult, null, 2));
+
+// Mainnet — use an existing wallet whose key is available; signature always required
+// const mainnetAccount = privateKeyToAccount(process.env.PRIVATE_KEY as `0x${string}`);
+// const mainnetResult = await dripWithRetry(mainnetAccount.address, mainnetAccount, 'mainnet');
+// console.log('Mainnet result:', JSON.stringify(mainnetResult, null, 2));
+
+// If you only have an address and no key on testnet (unsigned-only):
+// dripWithRetry(addressOnly, null, 'testnet');
+// NOTE: dripWithRetry(addressOnly, null, 'mainnet') will return immediately with
+// mainnet_signature_required_but_no_key — mainnet always requires a signature.
 ```
 
 ## Bash Example (Foundry — we own the wallet)
@@ -252,15 +328,31 @@ console.log('Result:', JSON.stringify(result, null, 2));
 #!/usr/bin/env bash
 set -euo pipefail
 
-FAUCET_URL="https://testnet.radiustech.xyz/api/v1/faucet"
+# Set NETWORK to "testnet" or "mainnet". Default: testnet.
+NETWORK="${NETWORK:-testnet}"
+
+if [ "$NETWORK" = "mainnet" ]; then
+  FAUCET_URL="https://dashboard.radiustech.xyz/api/v1/faucet"
+  RPC_URL="https://rpc.radiustech.xyz"
+  WEB_FAUCET="https://dashboard.radiustech.xyz/wallet"
+else
+  FAUCET_URL="https://testnet.radiustech.xyz/api/v1/faucet"
+  RPC_URL="https://rpc.testnet.radiustech.xyz"
+  WEB_FAUCET="https://testnet.radiustech.xyz/wallet"
+fi
+
 SBC_CONTRACT="0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb"
-RPC_URL="https://rpc.testnet.radiustech.xyz"
 # If the user passes a keystore name, use it; otherwise create a fresh wallet.
 # Do NOT default to a fixed name like "faucet-tmp" — if that keystore already exists
 # from a prior run, the import will silently no-op and signing will use the wrong key.
 KEYSTORE_NAME="${1:-}"
 
 if [ -z "$KEYSTORE_NAME" ]; then
+  if [ "$NETWORK" = "mainnet" ]; then
+    echo "ERROR: creating a throwaway wallet for mainnet is not recommended."
+    echo "Provide an existing keystore name as the first argument, or use the web faucet: $WEB_FAUCET"
+    exit 1
+  fi
   # No wallet provided — generate one and import under an address-derived name
   WALLET_OUT=$(cast wallet new 2>&1)
   ADDRESS=$(echo "$WALLET_OUT" | awk '/^Address:/{print $NF}')
@@ -274,9 +366,10 @@ else
   # Existing keystore — resolve address from it
   ADDRESS=$(cast wallet address --account "$KEYSTORE_NAME" --password "")
 fi
-echo "Wallet: $ADDRESS"
+echo "Wallet ($NETWORK): $ADDRESS"
 
 # 1. Try unsigned drip first
+#    On mainnet this will return signature_required immediately — that is expected.
 DRIP=$(curl -s -X POST "$FAUCET_URL/drip" \
   -H "Content-Type: application/json" \
   -d "{\"address\": \"$ADDRESS\", \"token\": \"SBC\"}")
@@ -294,6 +387,8 @@ if [ "$ERROR" = "signature_required" ]; then
   if [ "$(echo "$STATUS" | jq -r '.rate_limited')" = "true" ]; then
     WAIT=$(echo "$STATUS" | jq -r '.retry_after_ms // 60000')
     echo "Rate limited. Retry after ${WAIT}ms"
+    # On mainnet, WAIT is ~86400000 (24 hours) — do not loop, just report.
+    echo "If this is mainnet, your daily quota is exhausted. Try again tomorrow or use: $WEB_FAUCET"
     exit 1
   fi
 
@@ -327,23 +422,36 @@ echo "TX hash: $(echo "$DRIP" | jq -r '.tx_hash')"
 BALANCE_RAW=$(cast call "$SBC_CONTRACT" "balanceOf(address)(uint256)" "$ADDRESS" --rpc-url "$RPC_URL")
 echo "Balance raw: $BALANCE_RAW"
 BALANCE_UNITS=$(echo "$BALANCE_RAW" | awk '{print $1}')
-echo "SBC balance: $(echo "scale=6; $BALANCE_UNITS / 1000000" | bc) SBC"
+echo "SBC balance ($NETWORK): $(echo "scale=6; $BALANCE_UNITS / 1000000" | bc) SBC"
 ```
 
 ## Bash Example (address-only — we do NOT own the wallet)
 
-If you only have an address and no private key, you can only use the unsigned flow. If the faucet requires a signature, this will fail and you must tell the user.
+If you only have an address and no private key, you can only use the unsigned flow.
+
+- On **testnet**: if the faucet requires a signature, stop and tell the user.
+- On **mainnet**: the faucet **always** requires a signature. Do not even attempt this flow on mainnet — direct the user to the web faucet immediately.
 
 ```bash
 #!/usr/bin/env bash
 set -euo pipefail
+
+# Set NETWORK to "testnet" or "mainnet". Default: testnet.
+NETWORK="${NETWORK:-testnet}"
+
+if [ "$NETWORK" = "mainnet" ]; then
+  echo "ERROR: address-only (unsigned) flow cannot be used on mainnet."
+  echo "Mainnet always requires a signature. Provide the private key/keystore, or use:"
+  echo "  https://dashboard.radiustech.xyz/wallet"
+  exit 1
+fi
 
 FAUCET_URL="https://testnet.radiustech.xyz/api/v1/faucet"
 SBC_CONTRACT="0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb"
 RPC_URL="https://rpc.testnet.radiustech.xyz"
 ADDRESS="${1:?Usage: $0 <address>}"
 
-echo "Funding (unsigned only): $ADDRESS"
+echo "Funding (unsigned only, testnet): $ADDRESS"
 
 # Unsigned drip — the only option without a key
 DRIP=$(curl -s -X POST "$FAUCET_URL/drip" \
@@ -355,7 +463,7 @@ ERROR=$(echo "$DRIP" | jq -r '.error // empty')
 
 if [ "$ERROR" = "signature_required" ]; then
   echo "ERROR: Faucet requires a signature but we don't have the private key for $ADDRESS."
-  echo "Ask the user to provide the key/keystore, or use the web faucet: https://testnet.radiustech.xyz/testnet/faucet"
+  echo "Ask the user to provide the key/keystore, or use the web faucet: https://testnet.radiustech.xyz/wallet"
   exit 1
 fi
 
@@ -370,12 +478,12 @@ echo "TX hash: $(echo "$DRIP" | jq -r '.tx_hash')"
 BALANCE_RAW=$(cast call "$SBC_CONTRACT" "balanceOf(address)(uint256)" "$ADDRESS" --rpc-url "$RPC_URL")
 echo "Balance raw: $BALANCE_RAW"
 BALANCE_UNITS=$(echo "$BALANCE_RAW" | awk '{print $1}')
-echo "SBC balance: $(echo "scale=6; $BALANCE_UNITS / 1000000" | bc) SBC"
+echo "SBC balance (testnet): $(echo "scale=6; $BALANCE_UNITS / 1000000" | bc) SBC"
 ```
 
 **First-time keystore setup** (if no wallet exists, only run once, interactively):
 ```bash
-cast wallet import my-testnet-wallet --interactive
+cast wallet import my-wallet --interactive
 # Paste private key when prompted — it never appears in shell history or ps output
 ```
 
@@ -418,6 +526,11 @@ These mistakes are easy to make and have been observed in practice:
 | Reusing a fixed keystore name | `cast wallet import faucet-tmp …` when `faucet-tmp` already exists → import silently no-ops, signing uses the stale key → `invalid_signature` | Use `KEYSTORE_NAME="faucet-${ADDRESS:2:10}"` — the address makes the name unique per wallet |
 | Parsing `cast call` balance output | `int("500000 [5e5]", 16)` → ValueError | Extract first word (`awk '{print $1}'`), it is **decimal** not hex |
 | Variables across shells | Setting `FAUCET_URL=...` in one agent bash call, using `$FAUCET_URL` in the next → empty | Run the entire flow in one command, or inline all values |
+| Wrong network after copy-paste | Copying a testnet example without updating `FAUCET_URL` / `RPC_URL` → drip hits testnet faucet but on-chain check queries testnet RPC; mainnet balance stays 0 | Always set both `FAUCET_URL` **and** `RPC_URL` from the same `NETWORK` variable |
+| Unsigned flow on mainnet | Sending a `/drip` request without a signature to the mainnet faucet and waiting for it to succeed | Mainnet **always** returns `signature_required`. Either go straight to the signed flow, or fail fast if you don't have the key |
+| Retrying after mainnet rate limit | Looping on a `rate_limited` error from mainnet with the same wait-and-retry logic used on testnet | Mainnet `retry_after_ms` is ~86 400 000 ms (24 hours). Stop immediately, report the wait time to the user, and do not retry in-process |
+| Using testnet chain for mainnet on-chain check | Hardcoding `chain: radiusTestnet` in `createPublicClient` regardless of network → `balanceOf` query goes to the wrong chain, always returns 0 | Derive the chain from the `network` parameter; use `NETWORK_CONFIG[network].chain` |
+| Creating a throwaway mainnet wallet | Generating `generatePrivateKey()` and dripping to it on mainnet | Mainnet tokens have real value. Only drip to a wallet the user intends to keep. |
 
 ## Agentic Evaluation Loop
 
@@ -425,20 +538,22 @@ When an agent executes this skill, it should follow the evaluator-optimizer patt
 
 ### Success Criteria
 1. `drip.success === true` in the API response
-2. On-chain `balanceOf` returns a value **greater than zero** for the target address
+2. On-chain `balanceOf` returns a value **greater than zero** for the target address, queried against the **correct network's RPC**
 3. Both must hold — the on-chain check is the ground truth
 
 ### Critique on Failure
 
 | Error | Root Cause | Agent Action |
 |-------|-----------|--------------|
-| `rate_limited` | Too many requests from this address | Wait `retry_after_ms`, then retry |
-| `signature_required` | Faucet has signatures enabled | Fall back to signed flow — but **only if we have the private key**. If not, stop and tell the user. |
+| `rate_limited` (testnet) | Too many requests from this address | Wait `retry_after_ms`, then retry |
+| `rate_limited` (mainnet) | Daily quota exhausted | Stop. Report to user. Retry tomorrow. Do not loop. |
+| `signature_required` | Faucet has signatures enabled (always on mainnet) | Fall back to signed flow — but **only if we have the private key**. If not, stop and tell the user. |
 | `invalid_signature` | Wrong key or stale challenge | Re-fetch challenge, re-sign, retry |
 | `faucet_empty` | Faucet wallet is drained | Stop. Report to user. Retry later. |
 | `sbc_not_configured` | Server misconfiguration | Stop. Report to user. |
 | `internal_error` | Server-side failure | Retry once, then stop. |
 | Balance is 0 after success response | TX may be pending or RPC lag | Wait 2s, re-check balance once |
+| Balance is 0 and network is wrong | On-chain check used wrong chain/RPC | Verify `publicClient` is using the same network as the faucet request |
 
 ### Structured Output
 
@@ -447,6 +562,7 @@ Return this shape so callers can programmatically evaluate:
 ```json
 {
   "success": true,
+  "network": "testnet",
   "address": "0x...",
   "token": "SBC",
   "tx_hash": "0x...",
@@ -456,9 +572,11 @@ Return this shape so callers can programmatically evaluate:
 }
 ```
 
+The `network` field is required — callers must be able to verify that the correct network was targeted without inspecting logs.
+
 ### Iteration Budget
 
-Maximum **3 attempts** total. If all fail, return the structured output with `success: false` and the last error. Do not retry infinitely.
+Maximum **3 attempts** total. If all fail, return the structured output with `success: false` and the last error. Do not retry infinitely. On mainnet, a `rate_limited` response with `retry_after_ms > 3_600_000` counts as an immediate terminal failure — do not consume retry budget waiting 24 hours.
 
 ## API Reference
 
