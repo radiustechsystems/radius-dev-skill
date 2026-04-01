@@ -24,11 +24,11 @@ Use this Skill when the user asks for:
 ## Default stack decisions (opinionated)
 
 1) **TypeScript: viem (directly, no wrapper SDK)**
-- Use `defineChain` from viem to create the Radius chain definition with `fees.estimateFeesPerGas()`.
+- Use `defineChain` from viem to create the Radius chain definition.
 - Use `createPublicClient` for reads, `createWalletClient` for writes.
 - Use viem's native `watchContractEvent`, `getLogs`, and `watchBlockNumber` for event monitoring.
 - Do NOT use `@radiustechsystems/sdk` — it is deprecated. Use plain viem for everything.
-- ethers.js v6 also works with no overrides. When Radius returns `baseFeePerGas: 0x0`, ethers.js sets `maxFeePerGas: null` and falls back to legacy `gasPrice`, which works correctly. This skill defaults to viem for examples.
+- ethers.js v6 also works with no overrides. This skill defaults to viem for examples.
 
 2) **UI: wagmi + @tanstack/react-query for React apps**
 - Define the Radius chain via `defineChain` and pass it to wagmi's `createConfig`.
@@ -68,25 +68,16 @@ Use this Skill when the user asks for:
 - Fixed cost: ~0.0001 USD per standard ERC-20 transfer.
 - Fixed gas price: `9.85998816e-10` RUSD per gas (~986M wei, ~1 gwei).
 - `eth_gasPrice` returns the fixed gas price (NOT zero).
-- `eth_maxPriorityFeePerGas` returns `0x0` (no priority fee bidding).
+- `eth_maxPriorityFeePerGas` returns the actual gas price (same value as `eth_gasPrice`).
 - Failed transactions do NOT charge gas.
 - If a sender has SBC but not enough RUSD, the Turnstile converts SBC → RUSD inline. Conversion limits: minimum 0.1 SBC, maximum 10.0 SBC per trigger. One-way (SBC→RUSD only). Zero gas overhead. Requires sender to hold ≥0.1 SBC.
 
 ## Canonical chain definitions
 
-Always define the chain with `fees.estimateFeesPerGas()` — never rely on viem defaults. The fee override queries `eth_gasPrice` from the RPC and sets both EIP-1559 fee fields to the same value:
+Standard `defineChain`:
 
 ```typescript
 import { defineChain } from 'viem';
-import type { Chain, Client } from 'viem';
-
-const radiusFees = {
-  async estimateFeesPerGas(args: { client: Client }) {
-    const gasPrice = await args.client.request({ method: 'eth_gasPrice' });
-    const price = BigInt(gasPrice);
-    return { maxFeePerGas: price, maxPriorityFeePerGas: price };
-  },
-} satisfies Chain['fees'];
 
 export const radiusTestnet = defineChain({
   id: 72344,
@@ -96,7 +87,6 @@ export const radiusTestnet = defineChain({
   blockExplorers: {
     default: { name: 'Radius Testnet Explorer', url: 'https://testnet.radiustech.xyz' },
   },
-  fees: radiusFees,
 });
 
 export const radiusMainnet = defineChain({
@@ -107,7 +97,6 @@ export const radiusMainnet = defineChain({
   blockExplorers: {
     default: { name: 'Radius Explorer', url: 'https://network.radiustech.xyz' },
   },
-  fees: radiusFees,
 });
 ```
 
@@ -123,7 +112,7 @@ Always keep these in mind when writing code for Radius:
 | Required token | Must hold ETH for gas | Stablecoins only (USD) |
 | Reorgs | Possible | Impossible |
 | `eth_gasPrice` | Market rate | Fixed gas price (~986M wei) |
-| `eth_maxPriorityFeePerGas` | Suggested priority fee | Always `0x0` |
+| `eth_maxPriorityFeePerGas` | Suggested priority fee | Same as `eth_gasPrice` (no priority fee bidding) |
 | `eth_getBalance` | Native ETH balance | Native + convertible USD balance |
 | Execution primitive | Block (globally sequenced) | Transaction (blocks reconstructed on demand) |
 | `eth_blockNumber` | Monotonic block height | Current timestamp in milliseconds |
@@ -134,7 +123,7 @@ Always keep these in mind when writing code for Radius:
 | `eth_getLogs` | Address filter optional | Address filter **required** (error `-33014`) |
 | `eth_sendRawTransactionSync` | N/A | EIP-7966: sync tx+receipt (~50% less latency) |
 | `rad_getBalanceRaw` | N/A | Raw RUSD only (excludes convertible SBC) |
-| State queries | Historical state by block tag | Current state only (block tags ignored) |
+| State queries | Historical state by block tag | `latest`/`pending`/`safe`/`finalized` return current state; historical block numbers rejected (error `-32000`) |
 | SBC decimals | — | 6 decimals (NOT 18) |
 
 **Solidity patterns to watch:**
@@ -178,14 +167,14 @@ Standard ERC-20 interactions, storage operations, and events work unchanged.
 
 ### 3. Implement with Radius-specific correctness
 Always be explicit about:
-- Defining the Radius chain with `defineChain` including `fees.estimateFeesPerGas()`
+- Defining the Radius chain with `defineChain`
 - Using `createPublicClient` for reads and `createWalletClient` for writes (plain viem)
 - Stablecoin fee model (no ETH needed, no gas price bidding)
 - Sub-second finality (no need to wait for multiple confirmations)
 - SBC uses 6 decimals (use `parseUnits(amount, 6)`, NOT `parseEther`)
 - RUSD (native token) uses 18 decimals (use `parseEther` for native transfers)
 - Foundry keystore for CLI deploys (`--account`), environment variables for TypeScript — never pass private keys as CLI arguments
-- Gas price comes from `eth_gasPrice` RPC (not from viem defaults)
+- Gas price from `eth_gasPrice` RPC (viem handles this automatically via the chain definition)
 
 ### 4. Watch for production gotchas
 Before shipping, review [gotchas.md](references/gotchas.md) for:

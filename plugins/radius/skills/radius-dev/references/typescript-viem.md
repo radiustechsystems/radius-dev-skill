@@ -16,19 +16,10 @@ Requirements:
 
 ## Chain definition
 
-Define the Radius chain with `fees.estimateFeesPerGas()` so viem always uses the correct fixed gas price. The fee override queries `eth_gasPrice` from the RPC and sets both EIP-1559 fee fields to the same value:
+Standard `defineChain`:
 
 ```typescript
 import { defineChain } from 'viem';
-import type { Chain, Client } from 'viem';
-
-const radiusFees = {
-  async estimateFeesPerGas(args: { client: Client }) {
-    const gasPrice = await args.client.request({ method: 'eth_gasPrice' });
-    const price = BigInt(gasPrice);
-    return { maxFeePerGas: price, maxPriorityFeePerGas: price };
-  },
-} satisfies Chain['fees'];
 
 export const radiusTestnet = defineChain({
   id: 72344,
@@ -40,7 +31,6 @@ export const radiusTestnet = defineChain({
   blockExplorers: {
     default: { name: 'Radius Testnet Explorer', url: 'https://testnet.radiustech.xyz' },
   },
-  fees: radiusFees,
 });
 
 export const radiusMainnet = defineChain({
@@ -53,11 +43,8 @@ export const radiusMainnet = defineChain({
   blockExplorers: {
     default: { name: 'Radius Explorer', url: 'https://network.radiustech.xyz' },
   },
-  fees: radiusFees,
 });
 ```
-
-> **Important:** Always include `fees.estimateFeesPerGas()`. Without it, viem may derive invalid fee values and transactions will fail silently.
 
 ## Quick start
 

@@ -31,14 +31,14 @@ Use Radius when your application involves:
 
 ## Default stack
 
-- **TypeScript**: viem with `defineChain` — always set `fees.estimateFeesPerGas()` from the transaction cost API
+- **TypeScript**: viem with `defineChain`
 - **Smart contracts**: Foundry
 - **Payments**: x402 protocol with Radius facilitator
 - **Do NOT use** `@radiustechsystems/sdk` — deprecated. Use plain viem.
 
-## Gas price (critical)
+## Gas price
 
-Always fetch gas price from the transaction cost API — do not rely on viem defaults:
+When you need an explicit gas price (e.g., Foundry deploys, sanity bounds), fetch from the transaction cost API:
 
 ```typescript
 const res = await fetch('https://rpc.radiustech.xyz/api/v1/network/transaction-cost');
