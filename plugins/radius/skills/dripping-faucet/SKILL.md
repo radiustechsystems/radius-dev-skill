@@ -106,21 +106,12 @@ Every `curl` and `cast` call in the examples below includes an explicit `echo` o
 
 ```typescript
 import { defineChain, createPublicClient, http, erc20Abi, isAddress, formatUnits } from 'viem';
-import type { Chain, Client } from 'viem';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 
 // --- Configuration ---
 const FAUCET_URL = 'https://testnet.radiustech.xyz/api/v1/faucet';
 const SBC_CONTRACT = '0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb' as const;
 const SBC_DECIMALS = 6;
-
-const radiusFees = {
-  async estimateFeesPerGas(args: { client: Client }) {
-    const gasPrice = await args.client.request({ method: 'eth_gasPrice' });
-    const price = BigInt(gasPrice);
-    return { maxFeePerGas: price, maxPriorityFeePerGas: price };
-  },
-} satisfies Chain['fees'];
 
 const radiusTestnet = defineChain({
   id: 72344,
@@ -130,7 +121,6 @@ const radiusTestnet = defineChain({
   blockExplorers: {
     default: { name: 'Radius Testnet Explorer', url: 'https://testnet.radiustech.xyz' },
   },
-  fees: radiusFees,
 });
 
 // --- Wallet setup ---

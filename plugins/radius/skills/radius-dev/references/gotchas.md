@@ -24,16 +24,16 @@ The authoritative docs confirm: "RUSD uses 18 decimals, while SBC uses 6. For SB
 ## 2. Gas price is NOT zero
 
 - `eth_gasPrice` returns the fixed gas price (~986M wei, ~1 gwei).
-- `eth_maxPriorityFeePerGas` returns `0x0` (no priority fee bidding).
+- `eth_maxPriorityFeePerGas` returns the actual gas price (same value as `eth_gasPrice`).
 
-Query the gas price via `eth_gasPrice` RPC (the canonical chain definition does this automatically):
+Query the gas price via `eth_gasPrice` RPC:
 
 ```typescript
 const gasPrice = await publicClient.request({ method: 'eth_gasPrice' });
 const price = BigInt(gasPrice); // ~986000000n (~1 gwei)
 ```
 
-Define `fees.estimateFeesPerGas()` in your chain config — it queries `eth_gasPrice` and sets both `maxFeePerGas` and `maxPriorityFeePerGas` to the same value. If tooling derives zero or invalid fee values, transactions fail silently.
+Both `eth_gasPrice` and `eth_maxPriorityFeePerGas` return the correct fixed price. Standard viem fee estimation works.
 
 ---
 
@@ -208,9 +208,9 @@ Without this, server-side signature recovery fails for hardware wallet users.
 
 ---
 
-## 10. Nonce reading — "pending" block tag may not work
+## 10. Nonce reading for permits
 
-To read the current nonce for a permit, fall back from `"pending"` to `"latest"`:
+To read the current nonce for a permit:
 
 ```typescript
 async function readNonce(
@@ -219,53 +219,17 @@ async function readNonce(
   owner: Address
 ): Promise<string> {
   const data = '0x7ecebe00' + owner.slice(2).padStart(64, '0');
-
-  for (const blockTag of ['pending', 'latest'] as const) {
-    try {
-      const result = await publicClient.request({
-        method: 'eth_call',
-        params: [{ to: tokenAddress, data }, blockTag],
-      });
-      return BigInt(result).toString();
-    } catch (err) {
-      if (blockTag === 'latest') throw err;
-    }
-  }
-  throw new Error('Failed to read nonce');
+  const result = await publicClient.request({
+    method: 'eth_call',
+    params: [{ to: tokenAddress, data }, 'pending'],
+  });
+  return BigInt(result).toString();
 }
 ```
 
 ---
 
-## 11. EIP-1559 fee estimation can fail — force legacy `gasPrice`
-
-On Radius, EIP-1559 RPC signals can look valid but still lead clients to build invalid fee values:
-
-- `eth_gasPrice` returns ~`1 gwei` (usable)
-- `eth_maxPriorityFeePerGas` can return `0x0`
-- `eth_feeHistory` returns `baseFeePerGas`
-
-In this state, viem's EIP-1559 estimator may produce `maxFeePerGas: 0`, and the RPC rejects the transaction with `"Specified gas price is too low"`.
-
-Use an explicit legacy fee instead: fetch `gasPrice` and pass it directly in writes. This forces a type-0 transaction and bypasses broken EIP-1559 estimation.
-
-```typescript
-const gasPrice = await publicClient.getGasPrice();
-
-const hash = await walletClient.sendTransaction({
-    account,
-    to,
-    value,
-    data,
-    gasPrice, // <- explicit
-});
-```
-
-Important: don't pass EIP-1559 fee fields (`maxFeePerGas` and `maxPriorityFeePerGas`) when using `gasPrice` — they will be ignored.
-
----
-
-## 12. Settlement uses permit + transferFrom (two transactions)
+## 11. Settlement uses permit + transferFrom (two transactions)
 
 The x402 flow uses two-step on-chain settlement:
 
@@ -279,13 +243,13 @@ Both are sent from the settlement wallet. This means:
 
 ---
 
-## 13. CORS — proxy RPC calls through your backend
+## 12. CORS — proxy RPC calls through your backend
 
 The Radius RPC and Explorer API should be called from your server, not directly from the browser. Set up a thin proxy layer for browser-based apps.
 
 ---
 
-## 14. Explorer API base path is `/api`
+## 13. Explorer API base path is `/api`
 
 The Radius Explorer REST API is served under `/api`:
 
@@ -297,7 +261,7 @@ Not at the root path. This is not prominently documented.
 
 ---
 
-## 15. EIP-6963 wallet discovery timing
+## 14. EIP-6963 wallet discovery timing
 
 Modern multi-wallet setups fight over `window.ethereum`. Use EIP-6963:
 
@@ -322,7 +286,7 @@ Wait at least 500ms. Some wallets announce late.
 
 ---
 
-## 16. Extract revert reasons from wrapped errors
+## 15. Extract revert reasons from wrapped errors
 
 Radius reverts are wrapped in multiple error layers:
 
@@ -341,7 +305,7 @@ function extractRevertReason(err: any): string {
 
 ---
 
-## 17. Initialize chain stats before server listen
+## 16. Initialize chain stats before server listen
 
 If your app displays on-chain stats on the landing page, fetch them before `httpServer.listen()`. Otherwise the first visitors see all zeros.
 
@@ -358,12 +322,12 @@ httpServer.listen(port);
 
 ---
 
-## 18. nodejs_compat to the CF Workers
+## 17. nodejs_compat to the CF Workers
 
 Using viem server-side in Cloudflare Workers requires compatibility_flags = ["nodejs_compat"] in wrangler.toml. Without it, the Worker fails silently at deploy time or crashes at runtime.
 
 
-## 19. `eth_getLogs` requires an address filter
+## 18. `eth_getLogs` requires an address filter
 
 Unlike Ethereum, Radius **requires** an `address` field on all `eth_getLogs` calls. Omitting it returns error `-33014`.
 
@@ -388,7 +352,7 @@ For large time ranges, split into consecutive chunks of up to 1,000,000 block un
 
 ---
 
-## 20. `blockhash()` is predictable — NOT random
+## 19. `blockhash()` is predictable — NOT random
 
 On Radius, `BLOCKHASH` returns a timestamp-derived value, not a cryptographic hash. `blockhash(block.number - 1)` returns the previous millisecond timestamp cast to `bytes32`.
 
@@ -406,29 +370,19 @@ Vulnerable patterns: lotteries, NFT trait generation, commit-reveal schemes hash
 
 ---
 
-## 21. Historical state queries not supported
+## 20. Historical block numbers rejected; named tags return current state
 
-`eth_getBalance`, `eth_call`, `eth_getCode`, `eth_getStorageAt`, and `eth_getTransactionCount` **ignore the block tag parameter**. Whether you pass `"earliest"`, a specific past block number, or `"latest"`, the response reflects current state.
+State query methods (`eth_getBalance`, `eth_call`, `eth_getCode`, `eth_getStorageAt`, `eth_getTransactionCount`, `eth_estimateGas`) parse block tags as follows:
+
+- **Accepted:** `latest`, `pending`, `safe`, `finalized` — all return current state.
+- **Rejected:** Historical block numbers and `earliest` — return error `-32000`: `"required historical state unavailable, only 'latest', 'pending', 'safe', and 'finalized' are supported block tags"`.
 
 Radius does not support archive mode or historical state access.
 
 Implications:
 - Foundry fork mode (`--fork-block-number`) cannot query past state.
 - Debugging reverted transactions with `eth_call` at a past block is not available.
-- Price oracles and analytics that read historical balances return current values instead.
-
----
-
-## 22. Chain ID migration (723 → 723487)
-
-The Radius mainnet chain ID changed from `723` (`0x2D3`) to `723487` (`0xB0A1F`). The testnet chain ID (`72344`) is unchanged. This affects several areas:
-
-- **EIP-712 signatures:** Off-chain typed-data signatures (EIP-2612 permits, meta-transactions) signed with `chainId: 723` will not verify post-migration. DApps must re-request signatures from users.
-- **Wallet configurations:** Users who added Radius to MetaMask with chain ID `723` need to remove and re-add the network with `723487` (`0xB0A1F`).
-- **Hardcoded chain IDs:** Any application logic that hardcodes `723`, `0x2D3`, or `"723"` for chain detection or switching must be updated.
-- **Transaction history:** On-chain transactions confirmed before migration remain valid — finalized state is unaffected. Block explorers and indexers may need re-indexing.
-
-Best practice: read chain ID dynamically from the connected provider rather than hardcoding it.
+- Price oracles and analytics that query historical balances will get error `-32000`.
 
 ---
 
