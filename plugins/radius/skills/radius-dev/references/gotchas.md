@@ -386,6 +386,18 @@ Implications:
 
 ---
 
+## 21. Chain ID migration (723 → 723487)
+
+The Radius mainnet chain ID changed from `723` (`0x2D3`) to `723487` (`0xB0A1F`). The testnet chain ID (`72344`) is unchanged. This affects several areas:
+
+- **EIP-712 signatures:** Off-chain typed-data signatures (EIP-2612 permits, meta-transactions) signed with `chainId: 723` will not verify. DApps must re-request signatures from users.
+- **Wallet configurations:** Users who added Radius to MetaMask with chain ID `723` need to remove and re-add the network with `723487` (`0xB0A1F`).
+- **Hardcoded chain IDs:** Any application logic that hardcodes `723`, `0x2D3`, or `"723"` for chain detection or switching must be updated.
+
+Best practice: read chain ID dynamically from the connected provider rather than hardcoding it.
+
+---
+
 ## Quick reference: environment variables
 
 | Variable | Required | Description |
