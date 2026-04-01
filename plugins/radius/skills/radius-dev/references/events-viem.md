@@ -6,7 +6,7 @@ Radius supports standard EVM event watching and log queries using **plain viem**
 
 ## Setup
 
-Create a public client with the Radius chain definition (see [typescript-viem.md](typescript-viem.md) for the full `defineChain` pattern including `fees.estimateFeesPerGas()`):
+Create a public client with the Radius chain definition (see [typescript-viem.md](typescript-viem.md) for the full `defineChain` pattern):
 
 ```typescript
 import { createPublicClient, http } from 'viem';
