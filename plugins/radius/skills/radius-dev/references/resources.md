@@ -150,10 +150,3 @@ See the [Getting Started guide](https://docs.radiustech.xyz/get-started/getting-
 
 - [PArSEC Paper](https://dci.mit.edu/s/p.pdf) — Parallel Sharded Transactions with Contracts (Radius's theoretical foundation)
 - [Raft Consensus](https://raft.github.io/) — Consensus algorithm used per-shard in Radius
-
-## Transaction Cost API
-
-| Network | Endpoint |
-|---------|----------|
-| Testnet | `https://testnet.radiustech.xyz/api/v1/network/transaction-cost` |
-| Mainnet | `https://network.radiustech.xyz/api/v1/network/transaction-cost` |

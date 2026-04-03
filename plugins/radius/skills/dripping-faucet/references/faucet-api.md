@@ -7,7 +7,7 @@ Complete endpoint specifications for Radius Network faucet APIs.
 | Network | Base URL |
 |---------|----------|
 | Testnet | `https://testnet.radiustech.xyz/api/v1/faucet` |
-| Mainnet | TBD (expect stricter rate limits and possible additional auth requirements) |
+| Mainnet | `https://network.radiustech.xyz/api/v1/faucet` |
 
 All endpoints return `Content-Type: application/json`.
 
@@ -21,7 +21,17 @@ All endpoints return `Content-Type: application/json`.
 | Rate limit | 60 requests per 60-second window |
 | Signature required | **No** (but can be re-enabled at any time) |
 
-These values are subject to change. Always handle `signature_required` and `rate_limited` responses regardless of the current configuration.
+### Current Mainnet Configuration
+
+| Setting | Value |
+|---------|-------|
+| Drip amount | ~0.01 SBC per request |
+| Rate limit | 1 requests per 24-hour window |
+| Signature required | **Yes** |
+
+### Configuration Reminder
+
+These values are subject to change. Always handle `signature_required` and `rate_limited` responses regardless of the testnet or mainnet configuration.
 
 ---
 

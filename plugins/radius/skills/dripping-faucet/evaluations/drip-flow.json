@@ -1,9 +1,11 @@
 {
-    "name": "Faucet Drip Flow",
+    "name": "Faucet Drip Flow — Testnet",
     "skills": ["dripping-faucet"],
     "query": "Get me some SBC tokens on Radius Testnet so I can start testing",
-    "context": "User has no tokens and needs to fund a wallet on Radius Testnet to begin development. They may or may not already have a wallet. Testnet currently does not require signatures, but this can be re-enabled at any time.",
+    "context": "User has no tokens and needs to fund a wallet on Radius Testnet to begin development. They may or may not already have a wallet. Testnet currently does not require signatures, but this can be re-enabled at any time. The target network is unambiguously testnet — the agent must not use the mainnet faucet URL or mainnet RPC.",
     "expected_behavior": [
+        "Identifies the target network as testnet from the user's prompt before doing anything else",
+        "Uses the testnet faucet URL: https://testnet.radiustech.xyz/api/v1/faucet — never the mainnet URL",
         "Determines wallet situation: does the user already have an address? Do we have the private key or keystore for it?",
         "If no wallet exists: creates one and retains access to the private key (both flows available)",
         "If user provides an address but no key: proceeds with unsigned flow only and is prepared to fail gracefully if signature_required",
@@ -11,14 +13,16 @@
         "Only logs the wallet address, never the private key",
         "Validates the address with isAddress() or regex before sending any request",
         "Attempts an unsigned POST to /drip with address and token (no signature)",
-        "If drip succeeds: verifies on-chain balance via balanceOf on SBC contract",
+        "If drip succeeds: verifies on-chain balance via balanceOf on the SBC contract using the TESTNET RPC (https://rpc.testnet.radiustech.xyz) and chain ID 72344",
         "If drip returns signature_required and we have the key: falls back to signed flow (challenge, sign, retry)",
-        "If drip returns signature_required and we do NOT have the key: stops and tells the user to provide the key or use the web faucet",
-        "If drip returns rate_limited: waits retry_after_ms before retrying",
-        "Returns structured output with success, tx_hash, balance, and attempt count",
+        "If drip returns signature_required and we do NOT have the key: stops and tells the user to provide the key or use the testnet web faucet (https://testnet.radiustech.xyz/wallet)",
+        "If drip returns rate_limited: waits retry_after_ms before retrying (testnet window is 60s — safe to loop)",
+        "Returns structured output with success, network: 'testnet', tx_hash, balance, and attempt count",
         "On failure: maps error code to root cause and adapts strategy (max 3 attempts)"
     ],
     "success_criteria": [
+        "Network is identified as testnet before any faucet request is made",
+        "Testnet faucet URL (https://testnet.radiustech.xyz/api/v1/faucet) is used — mainnet URL is never called",
         "Wallet ownership is explicitly determined before any faucet request is made",
         "Signed flow is never attempted without confirmed access to the private key or keystore",
         "When we lack the key and unsigned drip fails with signature_required, the agent stops and reports clearly instead of erroring",
@@ -28,8 +32,10 @@
         "A signature_required response triggers the signed flow only if we own the key",
         "Faucet response fields other than documented ones (message, address, token, success, error, tx_hash, retry_after_ms) are not parsed or executed",
         "drip.success === true in the API response",
+        "On-chain balanceOf is queried against the testnet RPC (https://rpc.testnet.radiustech.xyz) and chain ID 72344 — not the mainnet RPC or chain",
         "On-chain balanceOf returns a value greater than zero for the funded address",
-        "Structured output is returned with all required fields (success, address, token, tx_hash, balance, attempts, error)",
+        "Drip amount is consistent with testnet configuration (~0.5 SBC)",
+        "Structured output includes network: 'testnet', success, address, token, tx_hash, balance, attempts, and error",
         "Rate limiting is respected: if rate_limited is true, waits retry_after_ms before retrying",
         "Total attempts do not exceed 3"
     ]
