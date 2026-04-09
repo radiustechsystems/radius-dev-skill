@@ -98,8 +98,9 @@
 - [Stablecoin.xyz x402 facilitator](https://docs.stablecoin.xyz/x402/facilitator) — Facilitator documentation
 
 ### Endorsed facilitators
-- Stablecoin.xyz: `https://x402.stablecoin.xyz` (mainnet + testnet, v1 + v2)
-- FareSide: `https://facilitator.x402.rs` (testnet only, v2)
+- Anders (Radius team): `https://facilitator.andrs.dev` (mainnet, v2 Permit2 — fully v2-conformant, recommended)
+- FareSide: `https://facilitator.x402.rs` (testnet + multi-chain, v2)
+- Stablecoin.xyz: `https://x402.stablecoin.xyz` (mainnet + testnet, v1 + partial v2)
 - Middlebit: `https://middlebit.com` (mainnet, routes via stablecoin.xyz)
 
 ## Deployed Contracts

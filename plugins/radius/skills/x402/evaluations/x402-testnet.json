@@ -1,0 +1,28 @@
+{
+    "name": "x402 Testnet Integration with FareSide Facilitator",
+    "skills": ["x402"],
+    "query": "Set up x402 payment gating on Radius testnet for my API. I have a fresh wallet that's never made an x402 payment before. Use the FareSide facilitator.",
+    "context": "User is building on Radius testnet (chain ID 72344). Their wallet has testnet SBC but has never interacted with Permit2. They want to gate an endpoint at 0.001 SBC per request and also write a client script to test it.",
+    "expected_behavior": [
+        "Server config uses network 'eip155:72344' (testnet, not mainnet)",
+        "Server config uses facilitator URL 'https://facilitator.x402.rs' (FareSide, not facilitator.andrs.dev)",
+        "Client uses chain ID 72344 for EIP-2612 and Permit2 domain signatures",
+        "Client uses testnet RPC URL 'https://rpc.testnet.radiustech.xyz'",
+        "Amount '1000' for 0.001 SBC (6 decimal places, not 18)",
+        "Warns about or handles FareSide's lack of EIP-2612 gas sponsoring for fresh wallets",
+        "Includes Permit2 pre-approval step for fresh wallets (EIP-2612 permit call on SBC contract granting Permit2 an allowance)",
+        "Pre-approval uses the correct permit domain: name 'Stable Coin', version '1', chainId 72344",
+        "Pre-approval spender is the Permit2 contract (0x000000000022D473030F116dDEE9F6B43aC78BA3)"
+    ],
+    "success_criteria": [
+        "Does NOT use facilitator.andrs.dev for testnet (mainnet-only facilitator)",
+        "Does NOT assume EIP-2612 gas sponsoring works on testnet with FareSide",
+        "SBC token address is 0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb (same on testnet)",
+        "Permit2 contract address is 0x000000000022D473030F116dDEE9F6B43aC78BA3 (same on testnet)",
+        "x402 Proxy address is 0x402085c248EeA27D92E8b30b2C58ed07f9E20001 (same on testnet)",
+        "EIP-2612 permit domain uses name 'Stable Coin' and version '1' (not 'SBC')",
+        "Fresh wallet pre-approval is included before the first x402 payment attempt",
+        "Amount uses 6-decimal raw units ('1000' for 0.001 SBC)",
+        "Private key is never logged or hardcoded"
+    ]
+}
