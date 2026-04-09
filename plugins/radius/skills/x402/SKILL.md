@@ -25,7 +25,7 @@ Use this Skill when the user asks to:
 - Understand the x402 HTTP 402 payment flow
 - Set up x402 middleware for a server
 
-**Not this Skill:** For general Radius development (chain config, wallet setup, smart contracts, event watching), use the **radius-dev** skill. For getting testnet/mainnet tokens, use the **dripping-faucet** skill. For direct on-chain payment patterns (pay-per-visit paywalls, streaming payments) that don't use x402 facilitators, see radius-dev's [micropayments.md](../radius-dev/references/micropayments.md).
+**Not this Skill:** For dApp development on Radius (wagmi, Foundry, event watching), use the **radius-dev** skill. For programmatic on-chain operations from agent code (balance checks, token transfers, contract interaction via wallet libraries), use the **radius-agent-ops** skill. For getting testnet/mainnet tokens, use the **dripping-faucet** skill. For direct on-chain payment patterns (pay-per-visit paywalls, streaming payments) that don't use x402 facilitators, see radius-dev's [micropayments.md](../radius-dev/references/micropayments.md).
 
 ## Protocol overview
 
@@ -126,6 +126,42 @@ const RADIUS_DEFAULTS = {
 // For testnet, override chainId:
 // const TESTNET_DEFAULTS = { ...RADIUS_DEFAULTS, chainId: 72344 };
 ```
+
+## Pre-flight checks
+
+Before writing integration code, verify the infrastructure is in place:
+
+**1. Facilitator is reachable and supports your network**
+
+```bash
+# Mainnet
+curl -s https://facilitator.andrs.dev/health | jq .status
+curl -s https://facilitator.andrs.dev/supported | jq '.kinds[] | .network'
+
+# Testnet
+curl -s https://facilitator.x402.rs/health
+curl -s https://facilitator.x402.rs/supported
+```
+
+The `/supported` response confirms the facilitator handles your network, transfer method (`permit2`), and EIP-2612 domain values. See [facilitator-api.md](references/facilitator-api.md) for full response format.
+
+**2. Wallet has SBC tokens**
+
+```typescript
+const balance = await publicClient.readContract({
+  address: '0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb',
+  abi: parseAbi(['function balanceOf(address) view returns (uint256)']),
+  functionName: 'balanceOf',
+  args: [walletAddress],
+});
+// balance is in 6-decimal raw units (e.g. 100000 = 0.1 SBC)
+```
+
+No SBC? Use the **dripping-faucet** skill to get tokens.
+
+**3. (Testnet only) Pre-approve Permit2 for FareSide**
+
+Fresh wallets must pre-approve the Permit2 contract before their first payment on testnet. See the [pre-approval helper](references/x402-client.md#testnet-pre-approving-permit2-for-fareside).
 
 ## Operating procedure
 
