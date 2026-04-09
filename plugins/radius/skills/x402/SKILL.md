@@ -173,14 +173,20 @@ Fresh wallets must pre-approve the Permit2 contract before their first payment o
 4. **Set environment variables** — `PAYMENT_ADDRESS` (your wallet) and optionally `FACILITATOR_API_KEY`
 5. **Deploy and test** — `curl` your endpoint to verify it returns 402 with correct requirements
 6. **Handle all outcome states** — see the exhaustive switch in [x402-server.md](references/x402-server.md)
+7. **Get discovered** — the x402 ecosystem has cross-chain service directories where buyers browse for paid APIs. As you deploy services on Radius, list them to reach a wider audience:
+   - [x402.org/ecosystem](https://x402.org/ecosystem) — official x402 ecosystem page and directory hub
+   - [x402list.fun](https://x402list.fun) — searchable directory by network, category, and pricing
 
 ### B. "I want to consume a paid x402 API" (client-side)
 
-1. **Request the endpoint** — receive 402 with payment requirements in response body
-2. **Parse the requirements** — extract `paymentRequirements[0]` from the 402 response
-3. **Sign both permits** — use `signX402Payment()` from [x402-client.md](references/x402-client.md)
-4. **Retry with payment** — set the `X-Payment` header to the base64-encoded payload
-5. **Receive data** — 200 response with the paid content
+1. **Find a service** — any HTTP endpoint returning 402 with a `paymentRequirements` array is an x402 service. To browse what's available across the ecosystem:
+   - [x402.org/ecosystem](https://x402.org/ecosystem) — official ecosystem listing
+   - [x402list.fun](https://x402list.fun) — searchable directory by network, category, and price tier
+2. **Request the endpoint** — receive 402 with payment requirements in response body
+3. **Parse the requirements** — extract `paymentRequirements[0]` from the 402 response
+4. **Sign both permits** — use `signX402Payment()` from [x402-client.md](references/x402-client.md)
+5. **Retry with payment** — set the `X-Payment` header to the base64-encoded payload
+6. **Receive data** — 200 response with the paid content
 
 ### Environment variables
 
