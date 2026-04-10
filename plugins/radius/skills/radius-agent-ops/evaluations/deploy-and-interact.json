@@ -1,0 +1,29 @@
+{
+  "name": "Deploy and Interact with a Contract",
+  "skills": ["radius-agent-ops"],
+  "query": "Deploy a simple counter contract on Radius testnet, read the initial count, increment it, and read the count again to verify",
+  "context": "User wants to deploy and interact with a minimal contract on Radius testnet. The agent should use general EVM tooling (cast, web3.py, or viem) and must not require radius-wallet-py or radius-wallet-ts.",
+  "expected_behavior": [
+    "Chooses a valid general-tooling path (cast, web3.py, or viem)",
+    "Deploys contract bytecode on testnet and captures tx hash",
+    "Waits for deployment receipt and obtains contract address",
+    "Reads initial count via contract call",
+    "Submits increment transaction via contract write",
+    "Waits for write transaction receipt",
+    "Reads count again and verifies it increased by 1",
+    "Returns contract address and explorer URLs",
+    "Never logs or displays the private key",
+    "Does not install, require, or mandate radius-wallet-py/radius-wallet-ts"
+  ],
+  "success_criteria": [
+    "A valid non-Radius-wallet tooling path is used (cast OR web3.py OR viem)",
+    "No step requires radius-wallet-py or radius-wallet-ts",
+    "Deployment produces a contract address from receipt output",
+    "Initial and final count reads are both performed",
+    "increment() write is confirmed by receipt before final read",
+    "Final count equals initial count + 1",
+    "Contract address and explorer links are reported",
+    "Private key is never printed, logged, or hardcoded",
+    "All operations target testnet by default"
+  ]
+}
