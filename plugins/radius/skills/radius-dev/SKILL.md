@@ -5,7 +5,7 @@ description: |
   when building dApps, frontends, or backend services that integrate with Radius using
   viem, wagmi, or Foundry. Covers React/Next.js with wagmi for wallet connection, plain
   viem for TypeScript integration (defineChain, createPublicClient, createWalletClient),
-  Foundry for smart contract project setup and testing, Hardhat/ethers.js compatibility,
+  Foundry for smart contract project setup, testing, and deployment, Hardhat/ethers.js compatibility,
   EIP-7966 synchronous transactions, micropayment patterns (pay-per-visit, API metering,
   streaming), event watching, production gotchas, and EVM compatibility differences from
   Ethereum. Not for simple on-chain operations from agent code (use radius-agent-ops).

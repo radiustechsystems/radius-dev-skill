@@ -1,15 +1,17 @@
 ---
 name: radius-agent-ops
 description: |
-  This skill should be used when the user or agent asks to "check balance on Radius",
-  "send SBC", "send RUSD", "transfer tokens on Radius", "deploy a contract on Radius",
-  "call a smart contract", "read contract state", "write to a contract",
-  "check transaction status", "get a transaction receipt", "interact with Radius network",
-  "use radius-wallet-py", "use radius-wallet-ts", or needs to perform on-chain operations
-  programmatically using the Radius wallet libraries. Covers wallet setup, balance queries,
-  token transfers, contract deployment and interaction, and transaction verification.
-  Not for dApp UI development with wagmi/React (use radius-dev), x402 HTTP payment protocol
-  (use x402), or dedicated faucet flows (use dripping-faucet).
+  This skill should be used when the user asks to "check balance on Radius",
+  "check my wallet balance", "send SBC", "send RUSD", "transfer tokens on Radius",
+  "deploy a contract on Radius", "call a smart contract", "read contract state",
+  "write to a contract", "check transaction status", "get a transaction receipt",
+  "verify a transaction on Radius", "get chain info on Radius",
+  "use radius-wallet-py", "use radius-wallet-ts", or needs to perform on-chain
+  operations programmatically using the Radius wallet libraries. Covers wallet setup,
+  balance queries, token transfers, contract deployment and interaction, and transaction
+  verification. Not for dApp UI development with wagmi/React (use radius-dev), x402
+  HTTP payment protocol (use x402), or dedicated faucet flows (use dripping-faucet).
+user-invocable: true
 ---
 
 # Radius Agent Operations
@@ -133,6 +135,7 @@ wallet = RadiusWallet.from_env()
 result = wallet.deploy_contract("0x608060...")
 contract = result["address"]
 print(f"Deployed at {contract}")
+print(f"Explorer: {wallet.explorer_url(result['tx_hash'])}")
 
 # Read state
 count = wallet.call_contract(contract, "getCount()", return_types=["uint256"])

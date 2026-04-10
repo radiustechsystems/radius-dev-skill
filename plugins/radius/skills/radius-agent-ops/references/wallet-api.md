@@ -205,13 +205,16 @@ result = wallet.request_faucet("SBC")    # Explicit token
 
 **TypeScript:**
 ```typescript
-const result = await wallet.requestFaucet();
+const result = await wallet.requestFaucet();       // Default: SBC
+const result = await wallet.requestFaucet("SBC");  // Explicit token
 ```
 
 **Behavior:**
 1. Attempts unsigned POST to `/drip`
 2. If faucet requires signature: automatically fetches challenge, signs with EIP-191, and retries
 3. If rate-limited: raises/throws with retry timing
+
+**Note:** The TypeScript library currently hardcodes the testnet faucet URL. For mainnet faucet requests, use the Python library (which selects the faucet URL based on chain ID) or load the **dripping-faucet** skill.
 
 For advanced faucet flows (manual challenge/sign, rate limit handling, mainnet-specific behavior), load the **dripping-faucet** skill.
 
@@ -305,6 +308,7 @@ tx_hash = wallet.send_contract_tx(
     arg_types=["address", "uint256"],
     args=["0xRecipient", 1000000],
     gas=200_000,       # Default: 100,000. Increase for complex calls.
+    value=0,           # Native RUSD to send with the call (in wei). Default: 0.
 )
 
 receipt = wallet.wait_for_tx(tx_hash)
@@ -323,6 +327,7 @@ const txHash = await wallet.writeContract(
   contractAbi,
   "transfer",
   ["0xRecipient", 1000000n],
+  0n,                  // Optional: native RUSD value to send with the call (bigint, in wei)
 );
 
 const receipt = await wallet.waitForTx(txHash);

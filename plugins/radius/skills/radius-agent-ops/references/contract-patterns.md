@@ -271,13 +271,31 @@ ppq_address = "0xDeployedPayPerQueryAddress"
 
 # Approve + deposit 5 SBC as a consumer
 amount = 5_000_000  # 5 SBC in base units
-wallet.send_contract_tx(SBC_ADDRESS, "approve(address,uint256)", ["address", "uint256"], [ppq_address, amount])
-tx = wallet.send_contract_tx(ppq_address, "deposit(uint256)", ["uint256"], [amount], gas=200_000)
+tx = wallet.send_contract_tx(
+    address=SBC_ADDRESS,
+    function_sig="approve(address,uint256)",
+    arg_types=["address", "uint256"],
+    args=[ppq_address, amount],
+)
+wallet.wait_for_tx(tx)
+
+tx = wallet.send_contract_tx(
+    address=ppq_address,
+    function_sig="deposit(uint256)",
+    arg_types=["uint256"],
+    args=[amount],
+    gas=200_000,
+)
 wallet.wait_for_tx(tx)
 
 # Make a query (deducts the per-query fee)
 query_hash = "0x" + "ab" * 32  # Your query identifier
-tx = wallet.send_contract_tx(ppq_address, "query(bytes32)", ["bytes32"], [bytes.fromhex(query_hash[2:])])
+tx = wallet.send_contract_tx(
+    address=ppq_address,
+    function_sig="query(bytes32)",
+    arg_types=["bytes32"],
+    args=[bytes.fromhex(query_hash[2:])],
+)
 receipt = wallet.wait_for_tx(tx)
 ```
 
