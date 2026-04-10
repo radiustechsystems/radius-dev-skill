@@ -549,3 +549,101 @@ approvePermit2ForTestnet();
 
 > **This is only needed for testnet with FareSide.** On mainnet, `facilitator.andrs.dev` handles
 > gas sponsoring automatically — no pre-approval required.
+
+---
+
+## Discovering x402 services
+
+x402 facilitators and registries that implement the `/discovery/resources` convention serve a machine-readable catalog of available services. This is the primary way agents discover paywalled APIs programmatically.
+
+### Known discovery endpoints
+
+| Provider | URL | Scope |
+|----------|-----|-------|
+| Coinbase CDP | `https://api.cdp.coinbase.com/platform/v2/x402/discovery/resources` | Cross-chain (Base, Solana, more) |
+| PayAI | `https://facilitator.payai.network/discovery/resources` | Cross-chain |
+
+### Response format
+
+Each endpoint returns a JSON object with an `items` array. Each item describes one paywalled service:
+
+```typescript
+interface DiscoveryResponse {
+  items: {
+    /** The paywalled endpoint URL */
+    resource: string;
+    /** Resource type (typically "http") */
+    type: string;
+    /** When the listing was last updated */
+    lastUpdated: string;
+    /** Payment options the service accepts */
+    accepts: {
+      /** Token contract address */
+      asset: string;
+      /** CAIP-2 network identifier (e.g. "eip155:723487" for Radius mainnet) */
+      network: string;
+      /** Price in raw token units */
+      maxAmountRequired: string;
+      /** Payment scheme (typically "exact") */
+      scheme: string;
+      /** Wallet receiving payment */
+      payTo: string;
+      /** Human-readable description of the service */
+      description: string;
+      /** Response content type */
+      mimeType: string;
+      /** Token metadata */
+      extra: { name: string; version: string };
+      /** Input/output schema for the endpoint (optional) */
+      outputSchema?: object;
+    }[];
+  }[];
+}
+```
+
+### Querying for Radius services
+
+Filter discovery results by Radius network identifiers to find services on Radius:
+
+```typescript
+const RADIUS_NETWORKS = ['eip155:723487', 'eip155:72344'];
+
+const DISCOVERY_ENDPOINTS = [
+  'https://api.cdp.coinbase.com/platform/v2/x402/discovery/resources',
+  'https://facilitator.payai.network/discovery/resources',
+];
+
+async function discoverRadiusServices() {
+  const services = [];
+
+  for (const endpoint of DISCOVERY_ENDPOINTS) {
+    try {
+      const res = await fetch(endpoint);
+      if (!res.ok) continue;
+      const data = await res.json();
+
+      for (const item of data.items ?? []) {
+        const radiusAccepts = item.accepts?.filter(
+          (a: any) => RADIUS_NETWORKS.includes(a.network),
+        );
+        if (radiusAccepts?.length) {
+          services.push({
+            url: item.resource,
+            description: radiusAccepts[0].description,
+            price: radiusAccepts[0].maxAmountRequired,
+            network: radiusAccepts[0].network,
+          });
+        }
+      }
+    } catch {
+      // Discovery endpoint unavailable — skip
+    }
+  }
+
+  return services;
+}
+```
+
+> **Discovery is additive.** As more facilitators and registries implement `/discovery/resources`,
+> add their URLs to the `DISCOVERY_ENDPOINTS` array. The response format is standardized across
+> providers.

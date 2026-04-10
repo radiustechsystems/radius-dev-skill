@@ -173,15 +173,11 @@ Fresh wallets must pre-approve the Permit2 contract before their first payment o
 4. **Set environment variables** — `PAYMENT_ADDRESS` (your wallet) and optionally `FACILITATOR_API_KEY`
 5. **Deploy and test** — `curl` your endpoint to verify it returns 402 with correct requirements
 6. **Handle all outcome states** — see the exhaustive switch in [x402-server.md](references/x402-server.md)
-7. **Get discovered** — the x402 ecosystem has cross-chain service directories where buyers browse for paid APIs. As you deploy services on Radius, list them to reach a wider audience:
-   - [x402.org/ecosystem](https://x402.org/ecosystem) — official x402 ecosystem page and directory hub
-   - [x402list.fun](https://x402list.fun) — searchable directory by network, category, and pricing
+7. **Get discovered** — register your service with x402 discovery endpoints so agents and buyers can find it programmatically. Facilitators that implement the `/discovery/resources` convention serve a machine-readable catalog of available services. See [x402-client.md § Discovering services](references/x402-client.md#discovering-x402-services) for the response format and known discovery endpoints.
 
 ### B. "I want to consume a paid x402 API" (client-side)
 
-1. **Find a service** — any HTTP endpoint returning 402 with a `paymentRequirements` array is an x402 service. To browse what's available across the ecosystem:
-   - [x402.org/ecosystem](https://x402.org/ecosystem) — official ecosystem listing
-   - [x402list.fun](https://x402list.fun) — searchable directory by network, category, and price tier
+1. **Discover services** — query `/discovery/resources` endpoints to find available x402 services programmatically. See [x402-client.md § Discovering services](references/x402-client.md#discovering-x402-services) for code and known endpoints. Any HTTP endpoint that returns 402 with a `paymentRequirements` array is also an x402 service — the 402 response itself is a discovery mechanism.
 2. **Request the endpoint** — receive 402 with payment requirements in response body
 3. **Parse the requirements** — extract `paymentRequirements[0]` from the 402 response
 4. **Sign both permits** — use `signX402Payment()` from [x402-client.md](references/x402-client.md)
