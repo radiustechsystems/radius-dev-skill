@@ -1,0 +1,30 @@
+{
+    "name": "Deploy and Interact with a Contract",
+    "skills": ["radius-agent-ops"],
+    "query": "Deploy a simple counter contract on Radius testnet, read the initial count, increment it, and read the count again to verify",
+    "context": "User wants to deploy a minimal smart contract to Radius testnet and interact with it. The agent should use radius-wallet-py for deployment and interaction, not Foundry CLI or raw RPC calls. RADIUS_PRIVATE_KEY is set in the environment.",
+    "expected_behavior": [
+        "Installs or imports radius-wallet-py",
+        "Loads wallet from environment with RadiusWallet.from_env()",
+        "Uses wallet.deploy_contract() with pre-compiled Counter bytecode (not forge create)",
+        "Waits for deployment receipt and extracts the contract address from the result",
+        "Reads the initial count using wallet.call_contract(address, 'getCount()', return_types=['uint256'])",
+        "Writes to the contract using wallet.send_contract_tx(address, 'increment()')",
+        "Waits for the write transaction to confirm via wallet.wait_for_tx()",
+        "Reads the count again to verify it incremented",
+        "Reports the contract address and explorer URL",
+        "Never logs or displays the private key"
+    ],
+    "success_criteria": [
+        "radius-wallet-py is used for all operations (deploy, read, write)",
+        "wallet.deploy_contract() is called with bytecode, not forge create or raw RPC",
+        "Contract address is extracted from the deployment result",
+        "Initial count is read via call_contract with return_types=['uint256']",
+        "increment() is called via send_contract_tx",
+        "Write transaction is confirmed via wait_for_tx before reading again",
+        "Final count is read and verified to be 1 (or initial + 1)",
+        "Contract address and explorer link are reported to the user",
+        "Private key is never exposed",
+        "All operations target testnet (default configuration)"
+    ]
+}

@@ -18,6 +18,8 @@ Request tokens from a Radius Network faucet. Handles unsigned and signed drip re
 - User asks how to get test funds on Radius
 - User mentions "mainnet faucet", "mainnet tokens", or "fund on mainnet"
 
+**Related Skills:** For on-chain operations after funding (balance checks, token transfers, contract deployment), use the **radius-agent-ops** skill. For dApp development, use the **radius-dev** skill.
+
 ## Network Selection
 
 Determine the target network **before** doing anything else — it controls the faucet URL, the RPC endpoint, the chain ID, and the expected behaviour.

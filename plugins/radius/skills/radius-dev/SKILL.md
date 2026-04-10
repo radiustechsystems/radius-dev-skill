@@ -1,6 +1,14 @@
 ---
 name: radius-dev
-description: End-to-end Radius Network development playbook. Stablecoin-native EVM with sub-second finality. Uses plain viem (defineChain, createPublicClient, createWalletClient) for all TypeScript integration. wagmi for React wallet integration. Foundry for smart contract development and testing. Also covers Hardhat/ethers.js compatibility and EIP-7966 synchronous transactions. Micropayment patterns (pay-per-visit content, real-time API metering, streaming payments), x402 protocol integration, stablecoin-native fees via Turnstile, ERC-20 operations, event watching, production gotchas, and EVM compatibility differences from Ethereum.
+description: |
+  End-to-end Radius Network application development playbook. This skill should be used
+  when building dApps, frontends, or backend services that integrate with Radius using
+  viem, wagmi, or Foundry. Covers React/Next.js with wagmi for wallet connection, plain
+  viem for TypeScript integration (defineChain, createPublicClient, createWalletClient),
+  Foundry for smart contract project setup and testing, Hardhat/ethers.js compatibility,
+  EIP-7966 synchronous transactions, micropayment patterns (pay-per-visit, API metering,
+  streaming), event watching, production gotchas, and EVM compatibility differences from
+  Ethereum. Not for simple on-chain operations from agent code (use radius-agent-ops).
 user-invocable: true
 ---
 
@@ -9,17 +17,19 @@ user-invocable: true
 ## What this Skill is for
 Use this Skill when the user asks for:
 - Radius dApp UI work (React / Next.js with wagmi)
-- Wallet connection + transaction signing on Radius
-- Smart contract deployment to Radius (Foundry / Solidity)
+- Wallet connection + transaction signing on Radius (wagmi, MetaMask)
+- Smart contract project setup, testing, and deployment with Foundry
 - Micropayment patterns (pay-per-visit content, API metering, streaming payments)
 - x402 protocol integration (per-request API billing, facilitator patterns)
 - TypeScript integration with viem (clients, transactions, contract interaction, events)
 - EVM compatibility questions specific to Radius
 - Stablecoin-native fee model and Turnstile mechanism
-- Radius network configuration, RPC endpoints, contract addresses
+- Event watching and log querying on Radius
 - Production gotchas (wallet compatibility, nonce management, decimal handling)
 - Hardhat or ethers.js integration with Radius
 - JSON-RPC differences and Radius-specific extensions (EIP-7966, `rad_getBalanceRaw`)
+
+**Not this Skill:** For programmatic on-chain operations from agent code (balance checks, token transfers, contract calls via `radius-wallet-py` or `radius-wallet-ts`), use the **radius-agent-ops** skill. For getting testnet/mainnet tokens, use the **dripping-faucet** skill. For x402 HTTP micropayment protocol integration, use the **x402** skill.
 
 ## Default stack decisions (opinionated)
 

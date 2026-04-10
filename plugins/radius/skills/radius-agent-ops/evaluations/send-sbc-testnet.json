@@ -1,0 +1,28 @@
+{
+    "name": "Send SBC on Testnet",
+    "skills": ["radius-agent-ops"],
+    "query": "Send 0.5 SBC to 0x742d35Cc6634C0532925a3b844Bc9e7595f2bD68 on Radius testnet",
+    "context": "User has RADIUS_PRIVATE_KEY set in environment and wants to transfer SBC to another address on testnet. The agent should use the radius-wallet-py library, not raw JSON-RPC calls.",
+    "expected_behavior": [
+        "Installs or imports radius-wallet-py (not raw httpx/requests JSON-RPC calls)",
+        "Loads wallet from environment with RadiusWallet.from_env()",
+        "Optionally checks SBC balance before sending to confirm sufficient funds",
+        "Calls wallet.send_sbc('0x742d35Cc6634C0532925a3b844Bc9e7595f2bD68', 0.5)",
+        "Calls wallet.wait_for_tx(tx_hash) to confirm the transaction",
+        "Checks wallet.tx_succeeded(receipt) to verify success",
+        "Returns the explorer URL via wallet.explorer_url(tx_hash)",
+        "Never logs, prints, or displays the private key",
+        "Uses testnet RPC (https://rpc.testnet.radiustech.xyz) — never mainnet"
+    ],
+    "success_criteria": [
+        "radius-wallet-py is used (RadiusWallet class), not custom JSON-RPC or raw HTTP calls",
+        "Wallet is loaded from environment variable, not hardcoded",
+        "wallet.send_sbc() is called with the correct recipient and amount",
+        "Transaction is confirmed via wait_for_tx() — not assumed instant",
+        "Transaction success is verified via tx_succeeded(receipt)",
+        "Explorer URL is generated and returned to the user",
+        "Private key is never logged, printed, or passed as a CLI argument",
+        "Testnet network is used (default) — mainnet RPC/chain ID never appears",
+        "Amount 0.5 is passed as a human-readable number, not in base units (not 500000)"
+    ]
+}
