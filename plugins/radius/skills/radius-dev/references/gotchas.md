@@ -229,17 +229,20 @@ async function readNonce(
 
 ---
 
-## 11. Settlement uses permit + transferFrom (two transactions)
+## 11. x402 settlement uses EIP-2612 permit + Permit2 transfer
 
-The x402 flow uses two-step on-chain settlement:
+> **For full x402 implementation details, see the x402 skill.**
 
-1. `permit(owner, spender, value, deadline, v, r, s)` — sets allowance
-2. `transferFrom(owner, paymentAddress, value)` — moves tokens
+The `facilitator.andrs.dev` facilitator uses a **Permit2 dual-signature** flow (not simple permit + transferFrom):
 
-Both are sent from the settlement wallet. This means:
-- The settlement wallet needs RUSD for gas.
-- The settlement wallet's address is the `spender` in the permit.
-- The `paymentAddress` (token recipient) can differ from the settlement wallet.
+1. **EIP-2612 permit** — client signs a permit where the **spender is the Permit2 contract** (`0x000000000022D473030F116dDEE9F6B43aC78BA3`), granting it allowance on SBC.
+2. **Permit2 PermitWitnessTransferFrom** — client signs a Permit2 authorization where the **spender is the x402 Proxy** (`0x402085c248EeA27D92E8b30b2C58ed07f9E20001`), which executes the actual transfer.
+
+The facilitator submits both on-chain. Key points:
+- The facilitator's settlement wallet pays gas (RUSD).
+- The EIP-2612 `spender` is the **Permit2 contract**, NOT the settlement wallet or payment recipient.
+- The Permit2 `spender` is the **x402 Proxy**, NOT the Permit2 contract.
+- The `payTo` address (token recipient) appears in the Permit2 `witness.to` field.
 
 ---
 

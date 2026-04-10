@@ -1,0 +1,35 @@
+{
+    "name": "x402 Server and Client Integration",
+    "skills": ["x402"],
+    "query": "Add x402 payment gating to my API endpoint that charges 0.0001 SBC per request on Radius mainnet, then write a script that calls it with a signed payment",
+    "context": "User has an existing HTTP API and wants to monetize it with x402 micropayments. They have a funded wallet with SBC on Radius mainnet. The facilitator at facilitator.andrs.dev is the target.",
+    "expected_behavior": [
+        "Creates an X402Config object with correct Radius mainnet values (asset, network eip155:723487, facilitator URL, amount '100' for 0.0001 SBC)",
+        "Implements processPayment() that reads X-Payment header, decodes base64, forwards to facilitator /verify and /settle",
+        "Returns 402 with paymentRequirements array when no X-Payment header is present",
+        "Payment requirements include assetTransferMethod: 'permit2' in extra field",
+        "Payment requirements include exact EIP-2612 domain: name 'Stable Coin', version '1'",
+        "Handles all PaymentOutcome states with correct HTTP status codes (402, 400, 502, 200)",
+        "Client script reads 402 response and extracts paymentRequirements[0]",
+        "Client reads EIP-2612 nonce from SBC contract via nonces(address)",
+        "Client signs both EIP-2612 permit (spender = Permit2 contract) and Permit2 PermitWitnessTransferFrom (spender = x402 Proxy)",
+        "Payload includes extensions.eip2612GasSponsoring with EIP-2612 signature",
+        "Payload includes payload.permit2Authorization with Permit2 details",
+        "Client base64-encodes the payload and sets X-Payment header",
+        "Uses SBC with 6 decimal precision throughout (never 18)"
+    ],
+    "success_criteria": [
+        "Server returns 402 with x402Version: 2 and valid paymentRequirements array when called without payment",
+        "SBC token address is 0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb",
+        "Network is eip155:723487 for mainnet",
+        "EIP-2612 permit domain uses name 'Stable Coin' and version '1' (not 'SBC' or other variants)",
+        "EIP-2612 permit spender is the Permit2 contract (0x000000000022D473030F116dDEE9F6B43aC78BA3), not the payTo address",
+        "Permit2 PermitWitnessTransferFrom spender is the x402 Proxy (0x402085c248EeA27D92E8b30b2C58ed07f9E20001)",
+        "Permit2 nonce is randomly generated, not sequential",
+        "Amount field uses 6-decimal raw units (e.g. '100' for 0.0001 SBC, not '100000000000000000000')",
+        "Private key is never logged, displayed, or hardcoded",
+        "Default facilitator URL for mainnet is facilitator.andrs.dev (preferred for v2 Permit2 flow)",
+        "Server correctly forwards payment to facilitator and returns data on successful settlement",
+        "Client handles non-200 responses after payment (re-fetch requirements if 402, retry if 502)"
+    ]
+}

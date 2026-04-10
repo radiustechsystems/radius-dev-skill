@@ -156,14 +156,14 @@ Standard ERC-20 interactions, storage operations, and events work unchanged.
 - **TypeScript/scripts layer** — Backend scripts, server-side verification, event monitoring
 - **Smart contract layer** — Solidity contracts, deployment, testing
 - **Micropayment layer** — Pay-per-visit, API metering, streaming payments
-- **x402 layer** — HTTP-native micropayments, facilitator integration
+- **x402 layer** — HTTP-native micropayments, facilitator integration (see the **x402** skill for full implementation details)
 
 ### 2. Pick the right building blocks
 - UI: wagmi + Radius chain via `defineChain` + React hooks
 - Scripts/backends: plain viem (`createPublicClient`, `createWalletClient`, `defineChain`)
 - Smart contracts: Foundry (`forge` / `cast`) + OpenZeppelin
 - Micropayments: viem + server-side verification + wallet integration
-- x402: Middleware pattern with Radius facilitator for settlement
+- x402: See the **x402** skill for server/client implementation, facilitator API, and signing patterns
 
 ### 3. Implement with Radius-specific correctness
 Always be explicit about:
