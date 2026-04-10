@@ -29,7 +29,7 @@ Use this Skill when the user asks for:
 - Hardhat or ethers.js integration with Radius
 - JSON-RPC differences and Radius-specific extensions (EIP-7966, `rad_getBalanceRaw`)
 
-**Not this Skill:** For programmatic on-chain operations from agent code (balance checks, token transfers, contract calls via `radius-wallet-py` or `radius-wallet-ts`), use the **radius-agent-ops** skill. For getting testnet/mainnet tokens, use the **dripping-faucet** skill. For x402 HTTP micropayment protocol integration, use the **x402** skill.
+**Not this Skill:** For programmatic on-chain operations from agent code (balance checks, token transfers, contract calls, and transaction verification), use the **radius-agent-ops** skill. For getting testnet/mainnet tokens, use the **dripping-faucet** skill. For x402 HTTP micropayment protocol integration, use the **x402** skill.
 
 ## Default stack decisions (opinionated)
 

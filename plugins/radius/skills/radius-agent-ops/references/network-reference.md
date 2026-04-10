@@ -1,6 +1,6 @@
 # Radius Network Reference
 
-All constants, addresses, and behavioral differences an agent needs to operate on Radius.
+Constants and behavioral differences needed for simple Radius operations.
 
 ## Network Endpoints
 
@@ -18,10 +18,13 @@ Mainnet RPC supports optional API key suffix: `https://rpc.radiustech.xyz/YOUR_A
 
 | Token | Type | Address | Decimals | Notes |
 |-------|------|---------|----------|-------|
-| RUSD | Native | *(native balance)* | 18 | Used for gas; obtained automatically via Turnstile |
-| SBC | ERC-20 | `0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb` | 6 | Primary payment token; same address on testnet and mainnet |
+| RUSD | Native | *(native balance)* | 18 | Used for gas |
+| SBC | ERC-20 | `0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb` | 6 | Same address on testnet and mainnet |
 
-**Decimal rule:** SBC amounts use 6 decimals (1.0 SBC = 1,000,000 base units). RUSD amounts use 18 decimals. The wallet libraries handle conversion automatically when passing human-readable amounts (e.g., `1.5`).
+Decimal rule:
+
+- SBC: 6 decimals (`1 SBC = 1,000,000` base units)
+- RUSD: 18 decimals (`1 RUSD = 1e18` wei)
 
 ## Key Deployed Contracts
 
@@ -34,35 +37,40 @@ Mainnet RPC supports optional API key suffix: `https://rpc.radiustech.xyz/YOUR_A
 
 ## Gas and Fees
 
-- **Fixed gas price**: ~986,000,000 wei (~1 gwei). No EIP-1559, no priority fees, no gas bidding.
-- **Cost per standard transfer**: ~0.0001 USD
-- **Failed transactions**: No gas charged on revert. Only successful transactions pay gas.
-- **Turnstile**: If the wallet holds SBC but insufficient RUSD for gas, the network automatically converts SBC to RUSD. Minimum trigger: 0.1 SBC. Maximum per trigger: 10.0 SBC.
+- **Fixed gas price**: about `986,000,000` wei (about 1 gwei)
+- **No EIP-1559 market mechanics**: no priority fee bidding
+- **Failed transactions**: no gas charged on revert
+- **Turnstile**: auto-converts SBC to RUSD for gas when eligible
+  - Minimum trigger: `0.1 SBC`
+  - Maximum per trigger: `10 SBC`
 
-## Radius vs. Ethereum Differences
-
-Only agent-relevant differences listed here. For the full comparison table, see the radius-dev skill.
+## Radius vs Ethereum Differences
 
 | Feature | Ethereum | Radius |
 |---------|----------|--------|
-| Fee model | Market-based ETH gas bids | Fixed ~0.0001 USD via Turnstile |
-| Settlement | ~12 min (12+ confirmations) | Sub-second finality (~200-500ms) |
-| Failed txs | Charge gas even if reverted | No gas charged on failure |
-| Reorgs | Possible | Impossible |
-| `eth_gasPrice` | Market rate | Fixed price (~986M wei) |
-| `eth_blockNumber` | Monotonic block height | Current timestamp in milliseconds |
-| `eth_getLogs` | Address filter optional | Address filter **required** (error `-33014`) |
-| Historical state | Queryable by block number | Only `latest`/`pending`/`safe`/`finalized` supported |
+| Fee model | Market gas bidding | Fixed-price stablecoin gas |
+| Settlement | Multi-block confirmation practice | Sub-second finality (~200-500ms) |
+| Failed txs | Gas charged on revert | No gas charged on revert |
+| Reorgs | Possible | Not possible |
+| `eth_gasPrice` | Market value | Fixed value |
+| `eth_blockNumber` | Monotonic block height | Timestamp in milliseconds |
+| `eth_getLogs` | Address filter optional | Address filter required (`-33014`) |
+| Historical state | Query by historical block | Only current tags supported |
 
 ## Environment Variables
 
 | Variable | Purpose | Required |
 |----------|---------|----------|
-| `RADIUS_PRIVATE_KEY` | Wallet private key (0x-prefixed, 64 hex chars) | Yes |
-| `RADIUS_RPC_URL` | Override default RPC endpoint | No |
-| `RADIUS_CHAIN_ID` | Override default chain ID | No |
+| `RADIUS_PRIVATE_KEY` | Signing key (0x-prefixed, 64 hex chars) | Yes for writes |
+| `RADIUS_RPC_URL` | RPC endpoint override | No |
+| `RADIUS_CHAIN_ID` | Chain ID override | No |
+| `SBC_ADDRESS` | SBC contract override (if needed) | No |
 
-**Security:** Never log, print, or pass `RADIUS_PRIVATE_KEY` as a CLI argument. Load from environment only. Ensure `.env` is in `.gitignore`.
+Security:
+
+- Keep signing keys in env vars or keystore.
+- Never print keys in logs.
+- Keep `.env` out of source control.
 
 ## Faucet Quick Reference
 
@@ -71,9 +79,7 @@ Only agent-relevant differences listed here. For the full comparison table, see 
 | Drip amount | ~0.5 SBC | ~0.01 SBC |
 | Rate limit | 60 requests/minute | 1 request/day |
 | Signature required | Not currently (may change) | Always |
-| Library call | `wallet.request_faucet()` | `wallet.request_faucet()` (auto-signs) |
-
-The wallet libraries handle unsigned/signed flows automatically. For advanced faucet control (manual challenge/sign, rate limit handling, error mapping), load the **dripping-faucet** skill.
+| Recommended path | `dripping-faucet` skill | `dripping-faucet` skill |
 
 ## Live Documentation
 

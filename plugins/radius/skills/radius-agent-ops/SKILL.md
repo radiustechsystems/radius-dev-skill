@@ -5,75 +5,69 @@ description: |
   "check my wallet balance", "send SBC", "send RUSD", "transfer tokens on Radius",
   "deploy a contract on Radius", "call a smart contract", "read contract state",
   "write to a contract", "check transaction status", "get a transaction receipt",
-  "verify a transaction on Radius", "get chain info on Radius",
-  "use radius-wallet-py", "use radius-wallet-ts", or needs to perform on-chain
-  operations programmatically using the Radius wallet libraries. Covers wallet setup,
-  balance queries, token transfers, contract deployment and interaction, and transaction
-  verification. Not for dApp UI development with wagmi/React (use radius-dev), x402
-  HTTP payment protocol (use x402), or dedicated faucet flows (use dripping-faucet).
+  "verify a transaction on Radius", or "get chain info on Radius".
+  Covers direct on-chain operations with general EVM tooling. Not for dApp UI
+  development with wagmi/React (use radius-dev), x402 HTTP payment protocol
+  (use x402), or dedicated faucet flows (use dripping-faucet).
 user-invocable: true
 ---
 
 # Radius Agent Operations
 
-Perform on-chain operations on the Radius network from agent code: check balances, send tokens, deploy and interact with smart contracts, and verify transactions.
+Perform simple on-chain operations on Radius: check balances, send tokens, deploy and interact with contracts, and verify transactions.
 
 ## When to Use
 
-- Check RUSD or SBC token balances
+- Check RUSD or SBC balances
 - Send SBC (ERC-20) or RUSD (native) transfers
-- Deploy a smart contract from bytecode
-- Read from or write to a deployed contract
-- Check transaction status or get a receipt
-- Query Radius network info (chain ID, gas price, block number)
+- Check transaction receipts and success/failure
+- Deploy a contract from bytecode and call contract functions
+- Query chain details (chain ID, gas price, block number behavior)
 
 **Not this Skill:** For dApp development with wagmi, React, or Foundry project setup, use the **radius-dev** skill. For x402 HTTP micropayment protocol, use the **x402** skill. For dedicated faucet token requests with full error handling, use the **dripping-faucet** skill.
 
-## Install the Wallet Library First
+## Tooling Precedence
 
-Do NOT write custom JSON-RPC calls, raw HTTP requests, or manual ABI encoding. The wallet libraries handle RPC communication, ABI encoding, decimal conversion, gas estimation, and nonce management.
+Use this order unless the user requests a specific tool:
 
-**Python** (recommended for agent frameworks):
+1. `cast` (CLI-first for quick actions)
+2. `web3.py` (Python automation fallback)
+3. `viem` (TypeScript automation fallback)
 
-```bash
-pip install git+https://github.com/radiustechsystems/radius-wallet-py.git
-```
+Do not require project-specific wallet wrapper libraries for this skill.
 
-**TypeScript:**
-
-```bash
-npm install github:radiustechsystems/radius-wallet-ts
-```
-
-**Environment setup:**
+## Setup and Security
 
 ```bash
-export RADIUS_PRIVATE_KEY=0x...   # 0x-prefixed, 64 hex characters
+# Network defaults (testnet)
+export RADIUS_RPC_URL=https://rpc.testnet.radiustech.xyz
+export RADIUS_CHAIN_ID=72344
+export SBC_ADDRESS=0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb
+
+# Signing key
+export RADIUS_PRIVATE_KEY=0x...  # 0x-prefixed, 64 hex chars
 ```
 
-Never log, print, or pass the private key as a CLI argument. Always load from the environment variable.
+- Store keys in environment variables or a keystore.
+- Never print private keys in output.
+- Never hardcode keys in scripts.
+- Keep `.env` out of git.
 
-## Quick Reference
+## Quick Action Reference
 
-| Operation | Python | TypeScript |
-|-----------|--------|------------|
-| Create wallet | `RadiusWallet.create()` | `RadiusWallet.create()` |
-| Load from env | `RadiusWallet.from_env()` | `RadiusWallet.fromEnv()` |
-| Check balances | `wallet.get_balances()` | `await wallet.getBalances()` |
-| Get SBC balance | `wallet.get_sbc_balance()` | `await wallet.getSbcBalance()` |
-| Get RUSD balance | `wallet.get_rusd_balance()` | `await wallet.getRusdBalance()` |
-| Send SBC | `wallet.send_sbc(to, amount)` | `await wallet.sendSbc(to, amount)` |
-| Send RUSD | `wallet.send_rusd(to, amount)` | `await wallet.sendRusd(to, amount)` |
-| Request faucet | `wallet.request_faucet()` | `await wallet.requestFaucet()` |
-| Wait for tx | `wallet.wait_for_tx(hash)` | `await wallet.waitForTx(hash)` |
-| Check tx success | `wallet.tx_succeeded(receipt)` | `receipt.status === "success"` |
-| Explorer link | `wallet.explorer_url(hash)` | `wallet.explorerUrl(hash)` |
-| Deploy contract | `wallet.deploy_contract(bytecode, ...)` | `await wallet.deployContract(abi, bytecode, ...)` |
-| Read contract | `wallet.call_contract(addr, sig, ...)` | `await wallet.readContract(addr, abi, fn, ...)` |
-| Write contract | `wallet.send_contract_tx(addr, sig, ...)` | `await wallet.writeContract(addr, abi, fn, ...)` |
-| Chain info | `wallet.get_chain_info()` | `await wallet.getChainInfo()` |
+| Operation | `cast` default | `web3.py` fallback | `viem` fallback |
+|-----------|----------------|--------------------|-----------------|
+| Wallet address | `cast wallet address --private-key "$RADIUS_PRIVATE_KEY"` | `Account.from_key(...)` | `privateKeyToAccount(...)` |
+| RUSD balance | `cast balance <addr> --rpc-url "$RADIUS_RPC_URL"` | `w3.eth.get_balance(addr)` | `publicClient.getBalance({ address })` |
+| SBC balance | `cast call $SBC_ADDRESS "balanceOf(address)(uint256)" <addr> --rpc-url "$RADIUS_RPC_URL"` | `token.functions.balanceOf(addr).call()` | `readContract(balanceOf)` |
+| Send SBC | `cast send $SBC_ADDRESS "transfer(address,uint256)" <to> <amount_6dp> ...` | `token.functions.transfer(...).build_transaction(...)` | `walletClient.writeContract(...)` |
+| Send RUSD | `cast send <to> --value <wei> ...` | `w3.eth.send_raw_transaction(...)` | `walletClient.sendTransaction(...)` |
+| Tx status | `cast receipt <tx_hash> --rpc-url "$RADIUS_RPC_URL"` | `w3.eth.get_transaction_receipt(...)` | `waitForTransactionReceipt(...)` |
+| Deploy bytecode | `cast send --create <bytecode> ...` | `Contract.constructor(...).build_transaction(...)` | `walletClient.deployContract(...)` |
+| Read contract | `cast call <addr> "fn(sig)(ret)" ...` | `contract.functions.fn(...).call()` | `publicClient.readContract(...)` |
+| Write contract | `cast send <addr> "fn(sig)" ...` | `contract.functions.fn(...).build_transaction(...)` | `walletClient.writeContract(...)` |
 
-For complete method signatures, parameters, and return types, consult [`references/wallet-api.md`](references/wallet-api.md).
+For copy-paste workflows with all three tooling paths, see [`references/core-workflows.md`](references/core-workflows.md).
 
 ## Radius Network Essentials
 
@@ -86,119 +80,103 @@ For complete method signatures, parameters, and return types, consult [`referenc
 
 **Critical Radius behavior:**
 
-- **SBC uses 6 decimals, RUSD uses 18.** The libraries handle conversion when passing human-readable amounts (e.g., `1.5`). For raw values, 1.0 SBC = 1,000,000 base units.
-- **Fixed gas pricing.** No EIP-1559, no priority fees. Gas price is ~1 gwei.
-- **Sub-second finality.** Transactions confirm in ~200-500ms. No reorgs possible.
+- **SBC uses 6 decimals, RUSD uses 18.** Convert amounts correctly.
+- **Fixed gas pricing.** No EIP-1559, no priority fees.
+- **Sub-second finality.** Transactions typically confirm in ~200-500ms.
 - **Failed transactions do not charge gas.** Only successful transactions pay.
-- **Block numbers are timestamps in milliseconds.** Not sequential block heights.
-- **Turnstile auto-converts SBC to RUSD for gas.** If the wallet has SBC but insufficient RUSD, the network converts automatically (min 0.1 SBC, max 10.0 SBC per trigger).
+- **Block numbers are timestamps in milliseconds.** Not sequential heights.
+- **Turnstile auto-converts SBC to RUSD for gas** under network limits.
 
-For the full network reference (deployed contracts, Radius vs. Ethereum differences, faucet details), consult [`references/network-reference.md`](references/network-reference.md).
+For full constants and behavior details, see [`references/network-reference.md`](references/network-reference.md).
 
 ## Core Workflows
 
 ### Check Balances
 
-```python
-from radius_wallet import RadiusWallet
-
-wallet = RadiusWallet.from_env()
-balances = wallet.get_balances()
-print(f"Address: {balances['address']}")
-print(f"SBC: {balances['sbc']}")
-print(f"RUSD: {balances['rusd']}")
+```bash
+ADDR=$(cast wallet address --private-key "$RADIUS_PRIVATE_KEY")
+cast balance "$ADDR" --rpc-url "$RADIUS_RPC_URL"
+cast call "$SBC_ADDRESS" "balanceOf(address)(uint256)" "$ADDR" --rpc-url "$RADIUS_RPC_URL"
 ```
 
 ### Send SBC and Verify
 
-```python
-from radius_wallet import RadiusWallet
+```bash
+# 0.5 SBC = 500000 base units (6 decimals)
+TX_HASH=$(cast send "$SBC_ADDRESS" \
+  "transfer(address,uint256)" \
+  0xRecipientAddress \
+  500000 \
+  --rpc-url "$RADIUS_RPC_URL" \
+  --private-key "$RADIUS_PRIVATE_KEY")
 
-wallet = RadiusWallet.from_env()
-tx_hash = wallet.send_sbc("0xRecipientAddress", 1.5)  # 1.5 SBC
-receipt = wallet.wait_for_tx(tx_hash)
+cast receipt "$TX_HASH" --rpc-url "$RADIUS_RPC_URL"
+```
 
-if wallet.tx_succeeded(receipt):
-    print(f"Sent! {wallet.explorer_url(tx_hash)}")
-else:
-    print("Transaction failed")
+### Send RUSD and Verify
+
+```bash
+# 0.001 RUSD = 1000000000000000 wei
+TX_HASH=$(cast send 0xRecipientAddress \
+  --value 1000000000000000 \
+  --rpc-url "$RADIUS_RPC_URL" \
+  --private-key "$RADIUS_PRIVATE_KEY")
+
+cast receipt "$TX_HASH" --rpc-url "$RADIUS_RPC_URL"
+```
+
+### Check Transaction Status
+
+```bash
+cast receipt 0xTxHash --rpc-url "$RADIUS_RPC_URL"
+# status=1 success, status=0 revert
+```
+
+Explorer link format:
+
+```text
+https://testnet.radiustech.xyz/tx/<tx_hash>
+https://network.radiustech.xyz/tx/<tx_hash>
 ```
 
 ### Deploy and Interact with a Contract
 
-```python
-from radius_wallet import RadiusWallet
+```bash
+BYTECODE=0x608060...
+DEPLOY_TX=$(cast send --create "$BYTECODE" --rpc-url "$RADIUS_RPC_URL" --private-key "$RADIUS_PRIVATE_KEY")
 
-wallet = RadiusWallet.from_env()
+# Read function
+cast call 0xContractAddress "getCount()(uint256)" --rpc-url "$RADIUS_RPC_URL"
 
-# Deploy (use pre-compiled bytecode or load from Foundry artifact)
-result = wallet.deploy_contract("0x608060...")
-contract = result["address"]
-print(f"Deployed at {contract}")
-print(f"Explorer: {wallet.explorer_url(result['tx_hash'])}")
-
-# Read state
-count = wallet.call_contract(contract, "getCount()", return_types=["uint256"])
-print(f"Count: {count}")
-
-# Write state
-tx = wallet.send_contract_tx(contract, "increment()")
-wallet.wait_for_tx(tx)
-
-# Verify
-count = wallet.call_contract(contract, "getCount()", return_types=["uint256"])
-print(f"Count after increment: {count}")
+# Write function
+WRITE_TX=$(cast send 0xContractAddress "increment()" --rpc-url "$RADIUS_RPC_URL" --private-key "$RADIUS_PRIVATE_KEY")
+cast receipt "$WRITE_TX" --rpc-url "$RADIUS_RPC_URL"
 ```
 
-For detailed contract patterns (constructor args, ERC-20 approve flows, Foundry CLI deployment, workshop contracts), consult [`references/contract-patterns.md`](references/contract-patterns.md).
-
-### Check Transaction Status
-
-```python
-from radius_wallet import RadiusWallet
-
-wallet = RadiusWallet.from_env()
-
-# Quick check (returns None if pending)
-receipt = wallet.get_tx_receipt("0xTxHash...")
-
-# Block until confirmed (with timeout)
-receipt = wallet.wait_for_tx("0xTxHash...", timeout=30.0)
-
-if wallet.tx_succeeded(receipt):
-    print(f"Success: {wallet.explorer_url('0xTxHash...')}")
-else:
-    print("Transaction reverted")
-```
+For detailed deployment and interaction patterns (approve flows, constructor args, workshop contracts), see [`references/contract-patterns.md`](references/contract-patterns.md).
 
 ### Fund a Wallet (Faucet)
 
-To request test tokens, call the one-liner:
-
-```python
-wallet.request_faucet()  # Handles unsigned + signed flows automatically
-```
-
-For advanced faucet control (manual challenge/sign, mainnet tokens, rate limit handling), load the **dripping-faucet** skill.
+For faucet flows, use the **dripping-faucet** skill.
 
 ## Pitfalls
 
 | Pitfall | Fix |
 |---------|-----|
-| Writing custom JSON-RPC or raw HTTP calls | Install and use `radius-wallet-py` or `radius-wallet-ts` |
-| Using 18 decimals for SBC amounts | SBC uses 6 decimals. The library handles conversion automatically. |
-| Bash state not persisting between agent tool calls | Run the complete flow in a single Python script, not across separate shell commands |
-| Not waiting for transaction confirmation | Always call `wait_for_tx(hash)` and check `tx_succeeded(receipt)` |
-| Logging or displaying the private key | Load from `RADIUS_PRIVATE_KEY` env var only. Never print or pass as CLI arg. |
-| Mainnet faucet without signature | The library handles signing automatically. For manual flows, a signature is always required on mainnet. |
+| Using 18 decimals for SBC | SBC uses 6 decimals. Convert to base units correctly. |
+| Not waiting for receipts | Always fetch receipt and verify `status`. |
+| Logging private key | Use env vars or keystore only, never print secrets. |
+| Assuming Ethereum block-number semantics | Radius `eth_blockNumber` is a timestamp in ms. |
+| Using mainnet by accident | Set `RADIUS_RPC_URL` and `RADIUS_CHAIN_ID` explicitly at start. |
+| Defaulting to raw JSON-RPC | Use `cast`, `web3.py`, or `viem` first; raw RPC is last-resort troubleshooting. |
 
 ## Additional Resources
 
 ### Reference Files
 
-- **[`references/wallet-api.md`](references/wallet-api.md)** — Complete API reference for both Python and TypeScript wallet libraries, including method signatures, return types, and raw JSON-RPC fallback
-- **[`references/contract-patterns.md`](references/contract-patterns.md)** — Contract deployment, interaction, ERC-20 approve patterns, and workshop contract examples
-- **[`references/network-reference.md`](references/network-reference.md)** — Network constants, deployed contracts, gas details, and Radius vs. Ethereum differences
+- **[`references/core-workflows.md`](references/core-workflows.md)** — Task-oriented workflows for `cast`, `web3.py`, and `viem`
+- **[`references/contract-patterns.md`](references/contract-patterns.md)** — Contract deployment/interaction patterns and ERC-20 approve flows
+- **[`references/network-reference.md`](references/network-reference.md)** — Network constants, gas behavior, and Radius vs Ethereum differences
 
 ### Related Skills
 

@@ -1,303 +1,234 @@
 # Contract Deployment and Interaction Patterns
 
-Workflows for deploying smart contracts and interacting with them on Radius, using the wallet libraries.
+Practical patterns for deploying and interacting with contracts on Radius using general EVM tooling.
 
-## Getting Contract Bytecode
+## Defaults
 
-### From Foundry Artifacts
+- Primary: `cast`
+- Python fallback: `web3.py`
+- TypeScript fallback: `viem`
 
-Compile with `forge build`, then load the artifact:
+## Core Constants
+
+```text
+Testnet RPC: https://rpc.testnet.radiustech.xyz
+Mainnet RPC: https://rpc.radiustech.xyz
+Testnet Chain ID: 72344
+Mainnet Chain ID: 723487
+SBC token: 0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb
+SBC decimals: 6
+```
+
+## Get Bytecode and ABI
+
+### From Foundry artifacts
+
+```bash
+forge build
+```
 
 ```python
 import json
 
-def load_artifact(name: str) -> dict:
-    """Load compiled contract artifact from Foundry's out/ directory."""
-    with open(f"out/{name}.sol/{name}.json") as f:
-        return json.load(f)
+with open("out/Counter.sol/Counter.json") as f:
+    artifact = json.load(f)
 
-artifact = load_artifact("MyContract")
-bytecode = artifact["bytecode"]["object"]   # Hex string starting with 0x
-abi = artifact["abi"]                       # For TypeScript usage
+bytecode = artifact["bytecode"]["object"]
+abi = artifact["abi"]
 ```
 
-### Pre-compiled Bytecode
+## Deploy Contract
 
-For simple contracts, embed the bytecode directly. Example — a minimal Counter contract:
-
-```python
-# Solidity source:
-#   uint256 public count;
-#   function increment() public { count += 1; }
-#   function getCount() public view returns (uint256) { return count; }
-
-COUNTER_BYTECODE = (
-    "0x6080604052348015600e575f5ffd5b506101778061001c5f395ff3fe60806040523480"
-    "1561000f575f5ffd5b506004361061003f575f3560e01c806306661abd14610043578063"
-    "a87d942c14610061578063d09de08a1461007f575b5f5ffd5b61004b610089565b604051"
-    "61005891906100c8565b60405180910390f35b61006961008e565b60405161007691906100"
-    "c8565b60405180910390f35b610087610096565b005b5f5481565b5f5f54905090565b6001"
-    "5f5f8282546100a7919061010e565b92505081905550565b5f819050919050565b6100c281"
-    "6100b0565b82525050565b5f6020820190506100db5f8301846100b9565b92915050565b7f"
-    "4e487b71000000000000000000000000000000000000000000000000000000005f52601160"
-    "045260245ffd5b5f610118826100b0565b9150610123836100b0565b92508282019050808211"
-    "1561013b5761013a6100e1565b5b9291505056fea2646970667358221220df9004bd1eca7f"
-    "9ccea721371446203e18a46b45aa1bb3de92a870337afe7b7564736f6c63430008210033"
-)
-```
-
-## Deploy with Wallet Library
-
-### Python — No Constructor Args
-
-```python
-from radius_wallet import RadiusWallet
-
-wallet = RadiusWallet.from_env()
-result = wallet.deploy_contract(COUNTER_BYTECODE)
-
-print(f"Address: {result['address']}")
-print(f"Explorer: {wallet.explorer_url(result['tx_hash'])}")
-```
-
-### Python — With Constructor Args
-
-```python
-from radius_wallet import RadiusWallet, SBC_ADDRESS
-
-wallet = RadiusWallet.from_env()
-artifact = load_artifact("PayPerQuery")
-
-result = wallet.deploy_contract(
-    bytecode=artifact["bytecode"]["object"],
-    constructor_types=["address", "uint256"],
-    constructor_args=[SBC_ADDRESS, 100_000],  # token address, price (0.1 SBC)
-)
-```
-
-### TypeScript — No Constructor Args
-
-```typescript
-import { RadiusWallet } from "radius-wallet-ts";
-
-const wallet = RadiusWallet.fromEnv();
-const result = await wallet.deployContract(counterAbi, "0x608060..." as `0x${string}`);
-console.log(`Address: ${result.address}`);
-```
-
-### TypeScript — With Constructor Args
-
-```typescript
-const artifact = JSON.parse(fs.readFileSync("out/PayPerQuery.sol/PayPerQuery.json", "utf8"));
-const result = await wallet.deployContract(
-  artifact.abi,
-  artifact.bytecode.object as `0x${string}`,
-  [SBC_ADDRESS, 100_000n],
-);
-```
-
-## Deploy with Foundry CLI
+### cast (default)
 
 ```bash
-# Simple deploy
-forge create src/Counter.sol:Counter \
-  --rpc-url https://rpc.testnet.radiustech.xyz \
-  --private-key $RADIUS_PRIVATE_KEY
+BYTECODE=0x608060...
+DEPLOY_TX=$(cast send --create "$BYTECODE" \
+  --rpc-url "$RADIUS_RPC_URL" \
+  --private-key "$RADIUS_PRIVATE_KEY")
 
-# With constructor args
+cast receipt "$DEPLOY_TX" --rpc-url "$RADIUS_RPC_URL"
+```
+
+### forge (source-based deployment)
+
+```bash
+forge create src/Counter.sol:Counter \
+  --rpc-url "$RADIUS_RPC_URL" \
+  --private-key "$RADIUS_PRIVATE_KEY"
+```
+
+For constructor args with source deployment:
+
+```bash
 forge create src/PayPerQuery.sol:PayPerQuery \
-  --rpc-url https://rpc.testnet.radiustech.xyz \
-  --private-key $RADIUS_PRIVATE_KEY \
+  --rpc-url "$RADIUS_RPC_URL" \
+  --private-key "$RADIUS_PRIVATE_KEY" \
   --constructor-args 0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb 100000
 ```
 
-**Security note:** Prefer `--account <keystore>` over `--private-key` to avoid exposing the key in shell history. Create a keystore with `cast wallet new`.
-
-## Read from Contracts
-
-### Python (string-based function signatures)
+### web3.py fallback
 
 ```python
-# No arguments
-count = wallet.call_contract(
-    address=contract_address,
-    function_sig="getCount()",
-    return_types=["uint256"],
-)
+import os
+from web3 import Web3
+from eth_account import Account
 
-# With arguments
-balance = wallet.call_contract(
-    address=contract_address,
-    function_sig="balanceOf(address)",
-    arg_types=["address"],
-    args=["0xHolderAddress"],
-    return_types=["uint256"],
-)
+w3 = Web3(Web3.HTTPProvider("https://rpc.testnet.radiustech.xyz"))
+acct = Account.from_key(os.environ["RADIUS_PRIVATE_KEY"])
 
-# Multiple return values
-name, symbol = wallet.call_contract(
-    address=contract_address,
-    function_sig="getInfo()",
-    return_types=["string", "string"],
-)
+contract = w3.eth.contract(abi=abi, bytecode=bytecode)
+nonce = w3.eth.get_transaction_count(acct.address)
+
+tx = contract.constructor().build_transaction({
+    "chainId": 72344,
+    "nonce": nonce,
+    "gas": 3_000_000,
+    "gasPrice": w3.eth.gas_price,
+})
+
+signed = acct.sign_transaction(tx)
+tx_hash = w3.eth.send_raw_transaction(signed.raw_transaction)
+receipt = w3.eth.wait_for_transaction_receipt(tx_hash)
+contract_address = receipt.contractAddress
 ```
 
-### TypeScript (typed ABI)
+### viem fallback
 
 ```typescript
-const count = await wallet.readContract(contractAddress, abi, "getCount");
-const balance = await wallet.readContract(contractAddress, abi, "balanceOf", ["0xHolder"]);
+const deployHash = await walletClient.deployContract({
+  abi: contractAbi,
+  bytecode: contractBytecode,
+  args: [],
+});
+
+const deployReceipt = await publicClient.waitForTransactionReceipt({ hash: deployHash });
+const contractAddress = deployReceipt.contractAddress as `0x${string}`;
 ```
 
-**Key difference:** Python uses string function signatures (e.g., `"balanceOf(address)"`) and manual type annotations. TypeScript uses a typed ABI and lets viem infer types.
+## Read and Write Contract Functions
 
-## Write to Contracts
+### cast
 
-### Python
+```bash
+# Read
+cast call 0xContractAddress "getCount()(uint256)" --rpc-url "$RADIUS_RPC_URL"
+
+# Write
+WRITE_TX=$(cast send 0xContractAddress "increment()" \
+  --rpc-url "$RADIUS_RPC_URL" \
+  --private-key "$RADIUS_PRIVATE_KEY")
+
+cast receipt "$WRITE_TX" --rpc-url "$RADIUS_RPC_URL"
+```
+
+### web3.py
 
 ```python
-# No arguments
-tx_hash = wallet.send_contract_tx(contract_address, "increment()")
-receipt = wallet.wait_for_tx(tx_hash)
-assert wallet.tx_succeeded(receipt)
+instance = w3.eth.contract(address=contract_address, abi=abi)
 
-# With arguments
-tx_hash = wallet.send_contract_tx(
-    address=contract_address,
-    function_sig="transfer(address,uint256)",
-    arg_types=["address", "uint256"],
-    args=["0xRecipient", 1_000_000],
-)
-receipt = wallet.wait_for_tx(tx_hash)
+count_before = instance.functions.getCount().call()
 
-# With higher gas limit (for complex calls)
-tx_hash = wallet.send_contract_tx(
-    address=contract_address,
-    function_sig="complexOperation(uint256)",
-    arg_types=["uint256"],
-    args=[42],
-    gas=500_000,  # Default is 100,000
-)
+tx = instance.functions.increment().build_transaction({
+    "chainId": 72344,
+    "nonce": w3.eth.get_transaction_count(acct.address),
+    "gas": 100_000,
+    "gasPrice": w3.eth.gas_price,
+})
+
+signed = acct.sign_transaction(tx)
+write_hash = w3.eth.send_raw_transaction(signed.raw_transaction)
+write_receipt = w3.eth.wait_for_transaction_receipt(write_hash)
 ```
 
-### TypeScript
+### viem
 
 ```typescript
-const txHash = await wallet.writeContract(contractAddress, abi, "increment");
-const receipt = await wallet.waitForTx(txHash);
+const countBefore = await publicClient.readContract({
+  address: contractAddress,
+  abi: contractAbi,
+  functionName: "getCount",
+});
 
-const txHash = await wallet.writeContract(
-  contractAddress,
-  abi,
-  "transfer",
-  ["0xRecipient", 1_000_000n],
-);
+const writeHash = await walletClient.writeContract({
+  address: contractAddress,
+  abi: contractAbi,
+  functionName: "increment",
+});
+
+await publicClient.waitForTransactionReceipt({ hash: writeHash });
 ```
 
 ## ERC-20 Approve + TransferFrom Pattern
 
-Many agent contracts (escrow, bounty boards, pay-per-query) require depositing SBC tokens. This requires a two-step approval pattern:
+Use this for escrow, bounty, and pay-per-query style contracts.
 
-1. **Approve** the contract to spend tokens on the wallet's behalf
-2. **Call** the contract function that pulls tokens via `transferFrom`
+### cast
 
-### Python
+```bash
+# 10 SBC = 10000000 base units
+APPROVE_TX=$(cast send 0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb \
+  "approve(address,uint256)" \
+  0xContractAddress \
+  10000000 \
+  --rpc-url "$RADIUS_RPC_URL" \
+  --private-key "$RADIUS_PRIVATE_KEY")
 
-```python
-from radius_wallet import SBC_ADDRESS
+cast receipt "$APPROVE_TX" --rpc-url "$RADIUS_RPC_URL"
 
-# Step 1: Approve the contract to spend 10 SBC
-amount_base = 10_000_000  # 10 SBC in base units (6 decimals)
-tx = wallet.send_contract_tx(
-    address=SBC_ADDRESS,
-    function_sig="approve(address,uint256)",
-    arg_types=["address", "uint256"],
-    args=[contract_address, amount_base],
-)
-wallet.wait_for_tx(tx)
+DEPOSIT_TX=$(cast send 0xContractAddress \
+  "deposit(uint256)" \
+  10000000 \
+  --rpc-url "$RADIUS_RPC_URL" \
+  --private-key "$RADIUS_PRIVATE_KEY")
 
-# Step 2: Call the contract function that pulls tokens
-tx = wallet.send_contract_tx(
-    address=contract_address,
-    function_sig="deposit(uint256)",
-    arg_types=["uint256"],
-    args=[amount_base],
-    gas=200_000,
-)
-receipt = wallet.wait_for_tx(tx)
-assert wallet.tx_succeeded(receipt)
+cast receipt "$DEPOSIT_TX" --rpc-url "$RADIUS_RPC_URL"
 ```
 
-### TypeScript
+### web3.py
+
+```python
+sbc = w3.eth.contract(address="0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb", abi=erc20_abi)
+app = w3.eth.contract(address=contract_address, abi=app_abi)
+amount = 10_000_000
+
+approve_tx = sbc.functions.approve(contract_address, amount).build_transaction({...})
+# sign, send, wait receipt
+
+deposit_tx = app.functions.deposit(amount).build_transaction({...})
+# sign, send, wait receipt
+```
+
+### viem
 
 ```typescript
-import { parseUnits } from "viem";
-import { SBC_ADDRESS, SBC_DECIMALS, ERC20_ABI } from "radius-wallet-ts";
+const amount = parseUnits("10", 6);
 
-const amount = parseUnits("10", SBC_DECIMALS); // 10 SBC
+const approveHash = await walletClient.writeContract({
+  address: "0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb",
+  abi: erc20Abi,
+  functionName: "approve",
+  args: [contractAddress, amount],
+});
+await publicClient.waitForTransactionReceipt({ hash: approveHash });
 
-// Step 1: Approve
-const approveTx = await wallet.writeContract(
-  SBC_ADDRESS,
-  [...ERC20_ABI, { type: "function", name: "approve", inputs: [{ name: "spender", type: "address" }, { name: "amount", type: "uint256" }], outputs: [{ name: "", type: "bool" }], stateMutability: "nonpayable" }],
-  "approve",
-  [contractAddress, amount],
-);
-await wallet.waitForTx(approveTx);
-
-// Step 2: Deposit
-const depositTx = await wallet.writeContract(contractAddress, contractAbi, "deposit", [amount]);
-await wallet.waitForTx(depositTx);
+const depositHash = await walletClient.writeContract({
+  address: contractAddress,
+  abi: appAbi,
+  functionName: "deposit",
+  args: [amount],
+});
+await publicClient.waitForTransactionReceipt({ hash: depositHash });
 ```
 
 ## Workshop Contracts
 
-The `radius-agent-contracts` repository provides four Solidity contracts designed for agent-to-agent commerce on Radius. All use SBC for payments.
+`radius-agent-contracts` includes:
 
-| Contract | Purpose | Key Functions |
-|----------|---------|---------------|
-| AgentEscrow | Two-party escrow for agent services | `createEscrow`, `complete`, `approve`, `dispute`, `refund` |
-| BountyBoard | Open task marketplace for agents | `postBounty`, `claimBounty`, `submitWork`, `approveBounty` |
-| PayPerQuery | Metered API billing | `deposit`, `query`, `withdraw`, `collectRevenue` |
-| PaymentSplitter | Revenue sharing with proportional weights | `depositSBC`, `claimShare`, `pendingShare` |
-
-**Example — PayPerQuery interaction:**
-
-```python
-from radius_wallet import RadiusWallet, SBC_ADDRESS
-
-wallet = RadiusWallet.from_env()
-ppq_address = "0xDeployedPayPerQueryAddress"
-
-# Approve + deposit 5 SBC as a consumer
-amount = 5_000_000  # 5 SBC in base units
-tx = wallet.send_contract_tx(
-    address=SBC_ADDRESS,
-    function_sig="approve(address,uint256)",
-    arg_types=["address", "uint256"],
-    args=[ppq_address, amount],
-)
-wallet.wait_for_tx(tx)
-
-tx = wallet.send_contract_tx(
-    address=ppq_address,
-    function_sig="deposit(uint256)",
-    arg_types=["uint256"],
-    args=[amount],
-    gas=200_000,
-)
-wallet.wait_for_tx(tx)
-
-# Make a query (deducts the per-query fee)
-query_hash = "0x" + "ab" * 32  # Your query identifier
-tx = wallet.send_contract_tx(
-    address=ppq_address,
-    function_sig="query(bytes32)",
-    arg_types=["bytes32"],
-    args=[bytes.fromhex(query_hash[2:])],
-)
-receipt = wallet.wait_for_tx(tx)
-```
+- `AgentEscrow`
+- `BountyBoard`
+- `PayPerQuery`
+- `PaymentSplitter`
 
 Repository: `github.com/radiustechsystems/radius-agent-contracts`
 
@@ -305,9 +236,9 @@ Repository: `github.com/radiustechsystems/radius-agent-contracts`
 
 | Problem | Cause | Fix |
 |---------|-------|-----|
-| Deployment tx succeeds but no contract address | Bytecode is invalid or constructor reverts | Verify bytecode is correct; check constructor args match expected types |
-| `gas required exceeds allowance` | Gas limit too low for deployment | Deployment default is 3,000,000; for interaction default is 100,000. Increase `gas` parameter for complex calls |
-| `nonce too low` | Previous tx still pending or nonce collision | Wait for prior tx to confirm, or use a fresh nonce |
-| Constructor arg encoding error | Mismatched types in `constructor_types` | Ensure types match Solidity exactly (e.g., `"uint256"` not `"uint"`, `"address[]"` for arrays) |
-| Revert with no reason | Solidity `require` failed without a message | Check contract source for the failing require; verify preconditions (balances, approvals) |
-| `execution reverted` on contract call | Calling a function that doesn't exist | Verify function signature matches exactly (no spaces, correct types) |
+| Deployment succeeds but no contract address visible | Reading wrong output field | Inspect receipt for `contractAddress` |
+| `gas required exceeds allowance` | Gas limit too low | Raise gas limit for deploy/write |
+| `nonce too low` | Pending tx or nonce reuse | Wait for pending tx, then retry with fresh nonce |
+| Revert on write | Preconditions not met | Check approvals, balances, and contract requirements |
+| Unexpected amount math | Decimal mismatch | SBC is 6 decimals, RUSD is 18 |
+| Key exposure risk | Unsafe signing flow | Use env vars/keystore; never paste keys into commands |
