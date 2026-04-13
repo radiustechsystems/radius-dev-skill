@@ -8,6 +8,7 @@ description: |
   using SBC token, or set up x402 middleware. Covers both server-side (protect your endpoints
   with payment gating) and client-side (sign and pay for x402-protected endpoints). Uses raw
   viem for all signing — no SDK dependencies beyond viem.
+published: true
 user-invocable: true
 ---
 

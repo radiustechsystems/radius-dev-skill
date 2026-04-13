@@ -5,6 +5,7 @@ description: |
   "fund my wallet", "get testnet tokens", "get mainnet tokens", "drip SBC", "use the faucet",
   "get test funds", "fund my wallet on mainnet", "get SBC on mainnet", or needs tokens on
   Radius Testnet or Mainnet to start developing or testing.
+published: true
 ---
 
 # Dripping Faucet

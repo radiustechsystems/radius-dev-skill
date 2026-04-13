@@ -1,6 +1,7 @@
 ---
 name: radius-dev
 description: End-to-end Radius Network development playbook. Stablecoin-native EVM with sub-second finality. Uses plain viem (defineChain, createPublicClient, createWalletClient) for all TypeScript integration. wagmi for React wallet integration. Foundry for smart contract development and testing. Also covers Hardhat/ethers.js compatibility and EIP-7966 synchronous transactions. Micropayment patterns (pay-per-visit content, real-time API metering, streaming payments), x402 protocol integration, stablecoin-native fees via Turnstile, ERC-20 operations, event watching, production gotchas, and EVM compatibility differences from Ethereum.
+published: true
 user-invocable: true
 ---
 
