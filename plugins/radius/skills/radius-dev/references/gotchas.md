@@ -229,20 +229,31 @@ async function readNonce(
 
 ---
 
-## 11. x402 settlement uses EIP-2612 permit + Permit2 transfer
+## 11. x402 settlement methods
 
 > **For full x402 implementation details, see the x402 skill.**
 
-The `facilitator.andrs.dev` facilitator uses a **Permit2 dual-signature** flow (not simple permit + transferFrom):
+x402 on Radius supports two settlement methods. Which one applies depends on the facilitator's `/supported` response.
 
-1. **EIP-2612 permit** — client signs a permit where the **spender is the Permit2 contract** (`0x000000000022D473030F116dDEE9F6B43aC78BA3`), granting it allowance on SBC.
-2. **Permit2 PermitWitnessTransferFrom** — client signs a Permit2 authorization where the **spender is the x402 Proxy** (`0x402085c248EeA27D92E8b30b2C58ed07f9E20001`), which executes the actual transfer.
+### Permit2 flow (`permit2`) — recommended
 
-The facilitator submits both on-chain. Key points:
-- The facilitator's settlement wallet pays gas (RUSD).
-- The EIP-2612 `spender` is the **Permit2 contract**, NOT the settlement wallet or payment recipient.
-- The Permit2 `spender` is the **x402 Proxy**, NOT the Permit2 contract.
-- The `payTo` address (token recipient) appears in the Permit2 `witness.to` field.
+The payer signs a Permit2 `SignatureTransfer` message. The facilitator submits it to the canonical `x402ExactPermit2Proxy` contract, which executes the transfer.
+
+- The **spender** in the signed Permit2 message is the `x402ExactPermit2Proxy` at `0x402085c248EeA27D92E8b30b2C58ed07f9E20001` (same across all supported EVM chains — see the [x402 exact EVM spec](https://github.com/coinbase/x402/blob/main/specs/schemes/exact/scheme_exact_evm.md)).
+- Integrators do **not** need to discover or fund a facilitator-specific settlement wallet.
+- The payer must have approved the Permit2 contract (`0x000000000022D473030F116dDEE9F6B43aC78BA3`) for the payment token beforehand.
+
+### EIP-2612 flow (`eip2612GasSponsoring`)
+
+The facilitator uses a two-step on-chain settlement:
+
+1. `permit(owner, spender, value, deadline, v, r, s)` — sets ERC-20 allowance
+2. `transferFrom(owner, paymentAddress, value)` — moves tokens
+
+Both transactions are sent by the facilitator from its own settlement wallet (the integrator does not operate this wallet). This means:
+- The facilitator's settlement wallet address is the `spender` in the EIP-2612 permit.
+- The facilitator covers gas (RUSD).
+- The `paymentAddress` (token recipient) can differ from the facilitator's settlement wallet.
 
 ---
 
@@ -406,7 +417,7 @@ Best practice: read chain ID dynamically from the connected provider rather than
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `RADIUS_RPC_API_KEY` | Yes (production) | API key for authenticated RPC access |
-| `SETTLEMENT_PRIVATE_KEY` | Yes (x402) | Private key for the settlement wallet (needs RUSD for gas) |
+| `SETTLEMENT_PRIVATE_KEY` | Self-hosted settlement only | Only needed if you operate your own settlement infrastructure. When using a hosted facilitator (Radius, Stablecoin.xyz, etc.), the facilitator manages settlement — you do not need this key. If required, use a secrets manager or encrypted keystore — see [security checklist](security.md). |
 | `SBC_ASSET` | No | SBC token address (default: `0x33ad...14fb`) |
 | `PAYMENT_ADDRESS` | No | Token recipient address |
 | `NETWORK_CHAIN_ID` | No | Chain ID (default: 723487 for mainnet, 72344 for testnet) |
