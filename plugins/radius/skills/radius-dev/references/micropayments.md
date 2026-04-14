@@ -1136,33 +1136,66 @@ setInterval(() => {
 > **For full x402 implementation details** (server-side payment gating, client-side permit signing,
 > facilitator API reference, and tested code patterns), see the **x402** skill.
 
-x402 is the HTTP-native payment protocol used for per-request API billing and micropayments. Facilitators handle on-chain settlement (EIP-2612 permit + Permit2 transfer) on behalf of clients.
+x402 is the HTTP-native payment protocol used for per-request API billing and micropayments. Facilitators handle on-chain settlement on behalf of clients. The recommended settlement method is **Permit2** — use it unless you have a specific reason to use EIP-2612.
+
+**Permit2 (`permit2`) — recommended:**
+The payer signs a Permit2 `SignatureTransfer` message. The spender is the canonical `x402ExactPermit2Proxy` contract at `0x402085c248EeA27D92E8b30b2C58ed07f9E20001` (same address across all supported EVM chains — see the [x402 exact EVM spec](https://github.com/coinbase/x402/blob/main/specs/schemes/exact/scheme_exact_evm.md)). No facilitator-specific wallet discovery is needed. Prerequisite: the payer must have approved the Permit2 contract (`0x000000000022D473030F116dDEE9F6B43aC78BA3`) for the payment token.
+
+**EIP-2612 with gas sponsoring (`eip2612GasSponsoring`):**
+The payer signs an EIP-2612 permit; the facilitator handles on-chain submission (`permit` + `transferFrom`) using its own gas.
+
+Which methods a facilitator supports is returned by its `/supported` endpoint (check the `methods` and `extensions` arrays).
 
 ### Endorsed facilitators
 
-| Facilitator | URL | Networks | Protocol | Notes |
-|-------------|-----|----------|----------|-------|
-| Anders (Radius team) | `https://facilitator.andrs.dev` | Mainnet (723487) | v2 (Permit2) | Fully v2-conformant; recommended for production |
-| FareSide | `https://facilitator.x402.rs` | Testnet (72344) + others | v2 | Free for testing; multi-chain |
-| Stablecoin.xyz | `https://x402.stablecoin.xyz` | Mainnet (723487) + Testnet (72344) | v1 + partial v2 | Does not fully conform to v2 spec |
-| Middlebit | `https://middlebit.com` | Mainnet (723487) | Routes via stablecoin.xyz | Multi-facilitator routing + analytics |
+| Facilitator | URL | Networks | Settlement methods | Notes |
+|-------------|-----|----------|--------------------|-------|
+| **Radius (mainnet)** | `https://facilitator.radiustech.xyz` | `eip155:723487` | `permit2`, `eip2612GasSponsoring` | **Recommended** — Radius-operated |
+| **Radius (testnet)** | `https://facilitator.testnet.radiustech.xyz` | `eip155:72344` | `permit2`, `eip2612GasSponsoring` | **Recommended** — Radius-operated |
+| Stablecoin.xyz | `https://x402.stablecoin.xyz` | Mainnet (723487) + Testnet (72344) | See `/supported` | Absorbs gas costs |
+| FareSide | `https://facilitator.x402.rs` | Testnet only (72344) | See `/supported` | Free for testing |
+| Middlebit | `https://middlebit.com` | Mainnet (723487) | See `/supported` | Multi-facilitator routing + analytics |
 
 ### x402 v2 protocol summary
 
-v2 uses CAIP-2 network identifiers and a dual-signature flow (EIP-2612 + Permit2):
+Protocol versions (v1, v2) define the HTTP transport — headers, encoding, and CAIP-2 identifiers. Settlement methods (`permit2`, `eip2612GasSponsoring`) define how tokens move on-chain. They are independent: a v2 facilitator may support either or both settlement methods.
+
+v2 uses CAIP-2 network identifiers and standardized HTTP headers:
 
 - **CAIP-2 network IDs:** `eip155:723487` (mainnet), `eip155:72344` (testnet)
-- **Client signs:** EIP-2612 permit (establishes Permit2 allowance) + Permit2 PermitWitnessTransferFrom (authorizes transfer)
-- **Payment header:** `X-Payment` — Base64-encoded signed payment payload (header name is configurable)
-- **Settlement:** Facilitator calls permit + permitWitnessTransferFrom on-chain
+- **Request header:** `PAYMENT-SIGNATURE` — Base64-encoded signed payment
+- **402 response header:** `PAYMENT-REQUIRED` — Base64-encoded payment requirements
+- **200 response header:** `PAYMENT-RESPONSE` — Base64-encoded settlement result
 
 ### Facilitator API endpoints
 
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
-| `/supported` | GET | Returns supported networks, schemes, and signer addresses |
+| `/supported` | GET | Returns supported networks, methods, extensions, and signer addresses |
 | `/verify` | POST | Validates payment signature without on-chain submission |
 | `/settle` | POST | Verifies and settles payment on Radius |
 | `/health` | GET | Facilitator status check |
+
+**Example `/supported` response** (Radius mainnet facilitator):
+
+```json
+{
+  "kinds": [
+    {
+      "scheme": "exact",
+      "network": "eip155:723487",
+      "methods": ["permit2"],
+      "extensions": ["eip2612GasSponsoring"]
+    }
+  ]
+}
+```
+
+Key fields for integrators:
+- `kinds[].network` — CAIP-2 chain identifier the facilitator settles on
+- `kinds[].methods` — settlement methods supported (e.g., `permit2`)
+- `kinds[].extensions` — additional capabilities (e.g., `eip2612GasSponsoring`)
+
+> **Note:** Verify this response shape against a live `GET /supported` call — field names or nesting may evolve between facilitator releases.
 
 For full x402 integration details, see the **x402** skill or fetch the live docs: `https://docs.radiustech.xyz/developer-resources/x402-integration.md`

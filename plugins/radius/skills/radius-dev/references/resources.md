@@ -92,15 +92,17 @@
 ## x402 Protocol
 
 - [x402.org](https://www.x402.org/) — Protocol specification and overview
+- [x402 exact EVM spec (Permit2)](https://github.com/coinbase/x402/blob/main/specs/schemes/exact/scheme_exact_evm.md) — Canonical `x402ExactPermit2Proxy` contract address and settlement scheme
 - [Radius x402 Integration (live docs)](https://docs.radiustech.xyz/developer-resources/x402-integration.md) — Radius-native x402 integration guide (always current)
 - [Stablecoin.xyz x402 overview](https://docs.stablecoin.xyz/x402/overview) — Hosted facilitator tooling for Radius
 - [Stablecoin.xyz x402 client docs](https://docs.stablecoin.xyz/x402/sdk) — Client documentation
 - [Stablecoin.xyz x402 facilitator](https://docs.stablecoin.xyz/x402/facilitator) — Facilitator documentation
 
 ### Endorsed facilitators
-- Anders (Radius team): `https://facilitator.andrs.dev` (mainnet, v2 Permit2 — fully v2-conformant, recommended)
-- FareSide: `https://facilitator.x402.rs` (testnet + multi-chain, v2)
-- Stablecoin.xyz: `https://x402.stablecoin.xyz` (mainnet + testnet, v1 + partial v2)
+- **Radius (mainnet):** `https://facilitator.radiustech.xyz` (`eip155:723487`; `permit2`, `eip2612GasSponsoring`) — **recommended**
+- **Radius (testnet):** `https://facilitator.testnet.radiustech.xyz` (`eip155:72344`; `permit2`, `eip2612GasSponsoring`) — **recommended**
+- Stablecoin.xyz: `https://x402.stablecoin.xyz` (mainnet + testnet, v1 + v2)
+- FareSide: `https://facilitator.x402.rs` (testnet only, v2)
 - Middlebit: `https://middlebit.com` (mainnet, routes via stablecoin.xyz)
 
 ## Deployed Contracts
@@ -112,6 +114,7 @@
 | SBC Token | `0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb` | **6** |
 | Arachnid Create2 Factory | `0x4e59b44847b379578588920cA78FbF26c0B4956C` | — |
 | Permit2 | `0x000000000022D473030F116dDEE9F6B43aC78BA3` | — |
+| x402ExactPermit2Proxy | `0x402085c248EeA27D92E8b30b2C58ed07f9E20001` | — |
 | Multicall3 | `0xcA11bde05977b3631167028862bE2a173976CA11` | — |
 | CreateX | `0xba5Ed099633D3B313e4D5F7bdc1305d3c28ba5Ed` | — |
 
@@ -124,6 +127,7 @@
 | CreateX | `0xba5Ed099633D3B313e4D5F7bdc1305d3c28ba5Ed` | — |
 | Multicall3 | `0xcA11bde05977b3631167028862bE2a173976CA11` | — |
 | Permit2 | `0x000000000022D473030F116dDEE9F6B43aC78BA3` | — |
+| x402ExactPermit2Proxy | `0x402085c248EeA27D92E8b30b2C58ed07f9E20001` | — |
 | EntryPoint v0.7 | `0x9b443e4bd122444852B52331f851a000164Cc83F` | — |
 | SimpleAccountFactory | `0x4DEbDe0Be05E51432D9afAf61D84F7F0fEA63495` | — |
 

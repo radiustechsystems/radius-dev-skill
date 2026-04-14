@@ -1,6 +1,6 @@
 ---
 name: radius-dev
-description: End-to-end Radius Network development playbook. Stablecoin-native EVM with sub-second finality. Uses plain viem (defineChain, createPublicClient, createWalletClient) for all TypeScript integration. wagmi for React wallet integration. Foundry for smart contract development and testing. Also covers Hardhat/ethers.js compatibility and EIP-7966 synchronous transactions. Micropayment patterns (pay-per-visit content, real-time API metering, streaming payments), x402 protocol integration, stablecoin-native fees via Turnstile, ERC-20 operations, event watching, production gotchas, and EVM compatibility differences from Ethereum.
+description: End-to-end Radius Network development playbook. Stablecoin-native EVM with sub-second finality. Uses plain viem (defineChain, createPublicClient, createWalletClient) for all TypeScript integration. wagmi for React wallet integration. Foundry for smart contract development and testing. Also covers Hardhat/ethers.js compatibility and EIP-7966 synchronous transactions. Micropayment patterns (pay-per-visit content, real-time API metering, streaming payments), x402 protocol integration, Radius x402 facilitators (Permit2 + EIP-2612), stablecoin-native fees via Turnstile, ERC-20 operations, event watching, production gotchas, and EVM compatibility differences from Ethereum.
 published: true
 user-invocable: true
 ---
@@ -164,7 +164,7 @@ Standard ERC-20 interactions, storage operations, and events work unchanged.
 - Scripts/backends: plain viem (`createPublicClient`, `createWalletClient`, `defineChain`)
 - Smart contracts: Foundry (`forge` / `cast`) + OpenZeppelin
 - Micropayments: viem + server-side verification + wallet integration
-- x402: See the **x402** skill for server/client implementation, facilitator API, and signing patterns
+- x402: Middleware pattern with Radius facilitator for settlement (Permit2 or EIP-2612) — see the **x402** skill for full implementation details
 
 ### 3. Implement with Radius-specific correctness
 Always be explicit about:
