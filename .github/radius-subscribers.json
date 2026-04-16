@@ -2,12 +2,11 @@
   "version": 1,
   "subscribers": [
     {
-      "id": "example-hermes-agent",
-      "enabled": false,
-      "name": "Example Hermes Agent",
-      "webhook_url": "https://your-agent.example.com/webhooks/github/radius-skills",
-      "secret_key": "example_hermes_agent",
-      "branch": "main",
+      "id": "hermes-0",
+      "enabled": true,
+      "name": "Agent 0",
+      "webhook_url": "rad-hermes-railway-template-production.up.railway.app/github/radius-skills",
+      "secret_key": "hermes-0",
       "repo_full_name": "radiustechsystems/radius-dev-skill"
     }
   ]
