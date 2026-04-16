@@ -5,7 +5,7 @@
       "id": "hermes-0",
       "enabled": true,
       "name": "Agent 0",
-      "webhook_url": "https://rad-hermes-railway-template-production.up.railway.app/github/radius-skills",
+      "webhook_url": "https://rad-hermes-railway-template-production.up.railway.app/webhooks/github/radius-skills",
       "secret_key": "hermes-0",
       "repo_full_name": "radiustechsystems/radius-dev-skill"
     }
