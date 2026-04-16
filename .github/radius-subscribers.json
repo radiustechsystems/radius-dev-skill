@@ -1,0 +1,37 @@
+{
+    "version": 1,
+    "subscribers": [
+        {
+            "id": "hermes-0",
+            "enabled": true,
+            "name": "Agent 0",
+            "webhook_url": "https://rad-hermes-railway-template-production.up.railway.app/webhooks/github/radius-skills",
+            "secret_key": "hermes-0",
+            "repo_full_name": "radiustechsystems/radius-dev-skill"
+        },
+        {
+            "id": "hermes-1",
+            "enabled": true,
+            "name": "Agent 1",
+            "webhook_url": "https://hermes-1-production.up.railway.app/webhooks/github/radius-skills",
+            "secret_key": "hermes-1",
+            "repo_full_name": "radiustechsystems/radius-dev-skill"
+        },
+        {
+            "id": "hermes-2",
+            "enabled": true,
+            "name": "BRAD [Agent 2]",
+            "webhook_url": "https://hermes-2-production.up.railway.app/webhooks/github/radius-skills",
+            "secret_key": "hermes-2",
+            "repo_full_name": "radiustechsystems/radius-dev-skill"
+        },
+        {
+            "id": "hermes-3",
+            "enabled": true,
+            "name": "Agent 3",
+            "webhook_url": "https://hermes-3-production.up.railway.app/webhooks/github/radius-skills",
+            "secret_key": "hermes-3",
+            "repo_full_name": "radiustechsystems/radius-dev-skill"
+        }
+    ]
+}

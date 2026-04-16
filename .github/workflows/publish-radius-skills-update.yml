@@ -1,0 +1,74 @@
+name: Publish Radius Skills Update
+
+on:
+  push:
+    branches:
+      - "**"
+  workflow_dispatch:
+    inputs:
+      after:
+        description: "Commit SHA to publish as the updated skills revision"
+        required: true
+        type: string
+      before:
+        description: "Optional previous commit SHA for replay payloads"
+        required: false
+        type: string
+      branch:
+        description: "Branch name to publish in the payload"
+        required: false
+        default: "main"
+        type: string
+      subscriber_id:
+        description: "Optional subscriber id to target a single agent"
+        required: false
+        type: string
+      repository:
+        description: "Optional owner/repo override for manual payloads"
+        required: false
+        type: string
+      dry_run:
+        description: "Validate and render the payload without sending webhooks"
+        required: false
+        default: false
+        type: boolean
+      ignore_failures:
+        description: "Allow the workflow to pass even if some deliveries fail"
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: publish-radius-skills-${{ github.workflow }}-${{ github.ref_name || inputs.branch || 'manual' }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate subscriber manifest
+        run: python3 scripts/radius_subscribers.py validate
+
+      - name: Publish skills update webhooks
+        env:
+          RADIUS_SUBSCRIBER_WEBHOOK_SECRETS_JSON: ${{ secrets.RADIUS_SUBSCRIBER_WEBHOOK_SECRETS_JSON }}
+          RADIUS_MANUAL_AFTER: ${{ inputs.after }}
+          RADIUS_MANUAL_BEFORE: ${{ inputs.before }}
+          RADIUS_MANUAL_BRANCH: ${{ inputs.branch }}
+          RADIUS_MANUAL_SUBSCRIBER_ID: ${{ inputs.subscriber_id }}
+          RADIUS_MANUAL_REPOSITORY: ${{ inputs.repository }}
+          RADIUS_DRY_RUN: ${{ inputs.dry_run }}
+          RADIUS_IGNORE_FAILURES: ${{ inputs.ignore_failures }}
+          RADIUS_PUBLISH_TIMEOUT_SECONDS: "20"
+        run: python3 scripts/radius_subscribers.py publish
