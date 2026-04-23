@@ -1,0 +1,12 @@
+{
+  "mcp": {
+    "servers": {
+      "radius": {
+        "command": "python3",
+        "args": [
+          "./runtime/radius_wallet_mcp.py"
+        ]
+      }
+    }
+  }
+}

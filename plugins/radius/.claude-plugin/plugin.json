@@ -1,6 +1,6 @@
 {
   "name": "radius-dev",
-  "description": "Radius Network development tools — blockchain development playbook, agent on-chain operations, and testnet faucet",
+  "description": "Legacy Radius bundle id for compatibility; includes Radius development, faucet, and agent wallet operation skills",
   "author": {
     "name": "Radius Technology Systems"
   }
