@@ -1,0 +1,35 @@
+name: Validate Radius Subscribers
+
+on:
+  pull_request:
+    paths:
+      - ".github/radius-subscribers.json"
+      - ".github/workflows/validate-radius-subscribers.yml"
+      - ".github/workflows/publish-radius-skills-update.yml"
+      - "scripts/radius_subscribers.py"
+      - "README.md"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/radius-subscribers.json"
+      - ".github/workflows/validate-radius-subscribers.yml"
+      - ".github/workflows/publish-radius-skills-update.yml"
+      - "scripts/radius_subscribers.py"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate subscriber manifest
+        run: python3 scripts/radius_subscribers.py validate
