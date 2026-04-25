@@ -28,7 +28,7 @@ def _runtime_root() -> Path:
 
     skills_dir = str(os.environ.get("RADIUS_SKILLS_DIR") or "").strip()
     if skills_dir:
-        candidates.append(Path(skills_dir).expanduser() / "plugins" / "radius" / "runtime")
+        candidates.append(Path(skills_dir).expanduser() / "runtimes" / "python")
 
     hermes_app_root = str(os.environ.get("HERMES_APP_ROOT") or "/app").strip()
     if hermes_app_root:
@@ -36,13 +36,12 @@ def _runtime_root() -> Path:
             Path(hermes_app_root).expanduser()
             / "vendor"
             / "radius-skills"
-            / "plugins"
-            / "radius"
-            / "runtime"
+            / "runtimes"
+            / "python"
         )
 
     here = Path(__file__).resolve().parent
-    candidates.append(here.parents[2] / "plugins" / "radius" / "runtime")
+    candidates.append(here.parents[2] / "runtimes" / "python")
 
     for candidate in candidates:
         if candidate.exists() and candidate.is_dir():

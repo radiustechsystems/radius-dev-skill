@@ -9,7 +9,6 @@ import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
-from decimal import Decimal, InvalidOperation, ROUND_DOWN
 from pathlib import Path
 
 
@@ -21,9 +20,20 @@ DEFAULT_PARA_BASE_URL_BETA = "https://api.beta.getpara.com"
 DEFAULT_PARA_BASE_URL_PROD = "https://api.getpara.com"
 SBC_DECIMALS = 6
 RUSD_DECIMALS = 18
+MIN_TRANSACTION_GAS = 21_000
+SBC_TRANSFER_GAS_EXTRA = 10_000
+SBC_TRANSFER_GAS_NUMERATOR = 6
+SBC_TRANSFER_GAS_DENOMINATOR = 5
+RUSD_TRANSFER_GAS_EXTRA = 1_000
+RUSD_TRANSFER_GAS_NUMERATOR = 11
+RUSD_TRANSFER_GAS_DENOMINATOR = 10
+TURNSTILE_MIN_SBC_RAW = 100_000
+TURNSTILE_MAX_SBC_RAW = 10_000_000
+RUSD_WEI_PER_SBC_RAW = 10 ** (RUSD_DECIMALS - SBC_DECIMALS)
 VALID_PROVIDERS = {"local", "para"}
 ADDRESS_RE = re.compile(r"^0x[a-fA-F0-9]{40}$")
 TX_HASH_RE = re.compile(r"^0x[a-fA-F0-9]{64}$")
+DECIMAL_AMOUNT_RE = re.compile(r"^(?:\d+(?:\.\d*)?|\.\d+)$")
 
 
 @dataclass(frozen=True)
@@ -46,6 +56,14 @@ class RadiusNetworkConfig:
         return "custom"
 
 
+@dataclass(frozen=True)
+class GasFeeEstimate:
+    gas_estimate: int
+    gas_limit: int
+    gas_price_wei: int
+    fee_wei: int
+
+
 def _format_units(value: int, decimals: int) -> str:
     negative = value < 0
     if negative:
@@ -58,19 +76,78 @@ def _format_units(value: int, decimals: int) -> str:
 
 
 def _parse_units(amount_str: str, decimals: int) -> int:
+    if decimals < 0:
+        raise ValueError("decimals must be non-negative")
     text = str(amount_str or "").strip()
     if not text:
         raise ValueError("missing amount")
-    try:
-        value = Decimal(text)
-    except InvalidOperation as err:
-        raise ValueError(f"invalid decimal amount: {amount_str!r}") from err
-    if not value.is_finite():
-        raise ValueError("amount must be finite")
-    if value <= 0:
+    if not DECIMAL_AMOUNT_RE.fullmatch(text):
+        raise ValueError(f"invalid decimal amount: {amount_str!r}")
+
+    integer_part, separator, fraction_part = text.partition(".")
+    integer_part = integer_part or "0"
+    if int(integer_part) == 0 and not any(digit != "0" for digit in fraction_part):
         raise ValueError("amount must be greater than zero")
-    scaled = (value * (Decimal(10) ** decimals)).to_integral_value(rounding=ROUND_DOWN)
-    return int(scaled)
+
+    if len(fraction_part) > decimals:
+        supported_fraction = fraction_part[:decimals].ljust(decimals, "0")
+        if int(integer_part) == 0 and int(supported_fraction or "0") == 0:
+            raise ValueError(f"amount is below the smallest base unit ({decimals} decimals)")
+        raise ValueError(f"amount has too many decimal places for {decimals}-decimal asset")
+
+    scale = 10**decimals
+    fraction_raw = int(fraction_part.ljust(decimals, "0") or "0") if separator else 0
+    raw_amount = int(integer_part) * scale + fraction_raw
+    if raw_amount == 0:
+        raise ValueError(f"amount is below the smallest base unit ({decimals} decimals)")
+    return raw_amount
+
+
+def _gas_limit_with_buffer(
+    gas_estimate: int,
+    extra_gas: int,
+    numerator: int,
+    denominator: int,
+) -> int:
+    if gas_estimate <= 0:
+        raise ValueError(f"invalid gas estimate: {gas_estimate}")
+    percent_buffer = (gas_estimate * numerator + denominator - 1) // denominator
+    return max(gas_estimate + extra_gas, percent_buffer)
+
+
+def _fee_from_gas_estimate(
+    gas_estimate: int,
+    gas_price_wei: int,
+    extra_gas: int,
+    numerator: int,
+    denominator: int,
+) -> GasFeeEstimate:
+    if gas_price_wei <= 0:
+        raise ValueError(f"invalid gas price: {gas_price_wei}")
+    gas_limit = _gas_limit_with_buffer(gas_estimate, extra_gas, numerator, denominator)
+    return GasFeeEstimate(
+        gas_estimate=gas_estimate,
+        gas_limit=gas_limit,
+        gas_price_wei=gas_price_wei,
+        fee_wei=gas_limit * gas_price_wei,
+    )
+
+
+def _minimum_fee_estimate(gas_price_wei: int) -> GasFeeEstimate:
+    return GasFeeEstimate(
+        gas_estimate=MIN_TRANSACTION_GAS,
+        gas_limit=MIN_TRANSACTION_GAS,
+        gas_price_wei=gas_price_wei,
+        fee_wei=MIN_TRANSACTION_GAS * gas_price_wei,
+    )
+
+
+def _ceil_div(numerator: int, denominator: int) -> int:
+    return (numerator + denominator - 1) // denominator
+
+
+def _rusd_wei_to_sbc_raw_ceil(value_wei: int) -> int:
+    return _ceil_div(value_wei, RUSD_WEI_PER_SBC_RAW)
 
 
 def _normalize_provider(provider: str | None) -> str:
@@ -372,6 +449,56 @@ class RadiusWalletRuntime:
             "sbc": _format_units(sbc_raw, SBC_DECIMALS),
             "sbc_raw": str(sbc_raw),
         }
+
+    def _gas_metadata(self, fee: GasFeeEstimate) -> dict:
+        return {
+            "gas_estimate": str(fee.gas_estimate),
+            "gas_limit": str(fee.gas_limit),
+            "gas_price_wei": str(fee.gas_price_wei),
+            "estimated_gas_fee_wei": str(fee.fee_wei),
+            "estimated_gas_fee_rusd": _format_units(fee.fee_wei, RUSD_DECIMALS),
+        }
+
+    def _ensure_fee_balance(
+        self,
+        balance: dict,
+        fee: GasFeeEstimate,
+        *,
+        rusd_reserved_wei: int,
+        sbc_reserved_raw: int,
+        transfer_description: str,
+        fee_label: str = "estimated gas fee",
+    ) -> None:
+        rusd_available_wei = int(balance["rusd_raw"]) - rusd_reserved_wei
+        sbc_available_raw = int(balance["sbc_raw"]) - sbc_reserved_raw
+        if rusd_available_wei >= fee.fee_wei:
+            return
+
+        fee_deficit_wei = fee.fee_wei - max(rusd_available_wei, 0)
+        turnstile_required_sbc_raw = max(
+            _rusd_wei_to_sbc_raw_ceil(fee_deficit_wei),
+            TURNSTILE_MIN_SBC_RAW,
+        )
+        if turnstile_required_sbc_raw > TURNSTILE_MAX_SBC_RAW:
+            raise RuntimeError(
+                f"Insufficient balance for {fee_label}. "
+                f"Need {_format_units(fee.fee_wei, RUSD_DECIMALS)} RUSD for gas, "
+                f"which exceeds the Turnstile per-transaction conversion limit."
+            )
+
+        if sbc_available_raw >= turnstile_required_sbc_raw:
+            return
+
+        raise RuntimeError(
+            f"Insufficient balance for {fee_label}. "
+            f"Need {_format_units(fee.fee_wei, RUSD_DECIMALS)} RUSD for gas after "
+            f"sending {transfer_description}. Available for fees: "
+            f"{_format_units(max(rusd_available_wei, 0), RUSD_DECIMALS)} RUSD and "
+            f"{_format_units(max(sbc_available_raw, 0), SBC_DECIMALS)} SBC. "
+            f"Need enough RUSD for gas or at least "
+            f"{_format_units(turnstile_required_sbc_raw, SBC_DECIMALS)} SBC "
+            f"available for Turnstile."
+        )
 
     def _wait_for_receipt(self, tx_hash: str) -> dict | None:
         try:
@@ -701,6 +828,14 @@ class RadiusWalletRuntime:
         checksum_to = Web3.to_checksum_address(to_address)
         tx_data = contract.functions.transfer(checksum_to, amount_raw)._encode_transaction_data()
         gas_price = int(w3.eth.gas_price)
+        self._ensure_fee_balance(
+            balance,
+            _minimum_fee_estimate(gas_price),
+            rusd_reserved_wei=0,
+            sbc_reserved_raw=amount_raw,
+            transfer_description=f"{amount_sbc} SBC",
+            fee_label="minimum gas fee",
+        )
         nonce = int(w3.eth.get_transaction_count(checksum_from))
         try:
             gas_estimate = int(
@@ -720,13 +855,26 @@ class RadiusWalletRuntime:
                     f"Insufficient SBC balance. Have {balance['sbc']}, need {amount_sbc}."
                 ) from err
             raise
-        gas_limit = max(gas_estimate + 10_000, int(gas_estimate * 1.2))
+        fee = _fee_from_gas_estimate(
+            gas_estimate,
+            gas_price,
+            SBC_TRANSFER_GAS_EXTRA,
+            SBC_TRANSFER_GAS_NUMERATOR,
+            SBC_TRANSFER_GAS_DENOMINATOR,
+        )
+        self._ensure_fee_balance(
+            balance,
+            fee,
+            rusd_reserved_wei=0,
+            sbc_reserved_raw=amount_raw,
+            transfer_description=f"{amount_sbc} SBC",
+        )
 
         sign_payload = {
             "transaction": {
                 "to": Web3.to_checksum_address(self.config.sbc_address),
                 "value": 0,
-                "gasLimit": gas_limit,
+                "gasLimit": fee.gas_limit,
                 "gasPrice": gas_price,
                 "nonce": nonce,
                 "chainId": self.config.chain_id_int,
@@ -753,6 +901,7 @@ class RadiusWalletRuntime:
             "network": self.config.network,
             "explorer_url": f"{self.config.explorer_url}/tx/{tx_hash}",
         }
+        result.update(self._gas_metadata(fee))
         return self._apply_receipt(result, self._wait_for_receipt(tx_hash))
 
     def _send_rusd_para(self, to_address: str, amount_rusd: str, value_wei: int) -> dict:
@@ -771,6 +920,14 @@ class RadiusWalletRuntime:
         checksum_from = Web3.to_checksum_address(from_address)
         checksum_to = Web3.to_checksum_address(to_address)
         gas_price = int(w3.eth.gas_price)
+        self._ensure_fee_balance(
+            balance,
+            _minimum_fee_estimate(gas_price),
+            rusd_reserved_wei=value_wei,
+            sbc_reserved_raw=0,
+            transfer_description=f"{amount_rusd} RUSD",
+            fee_label="minimum gas fee",
+        )
         nonce = int(w3.eth.get_transaction_count(checksum_from))
         gas_estimate = int(
             w3.eth.estimate_gas(
@@ -782,12 +939,25 @@ class RadiusWalletRuntime:
                 }
             )
         )
-        gas_limit = max(gas_estimate + 1_000, int(gas_estimate * 1.1))
+        fee = _fee_from_gas_estimate(
+            gas_estimate,
+            gas_price,
+            RUSD_TRANSFER_GAS_EXTRA,
+            RUSD_TRANSFER_GAS_NUMERATOR,
+            RUSD_TRANSFER_GAS_DENOMINATOR,
+        )
+        self._ensure_fee_balance(
+            balance,
+            fee,
+            rusd_reserved_wei=value_wei,
+            sbc_reserved_raw=0,
+            transfer_description=f"{amount_rusd} RUSD",
+        )
         sign_payload = {
             "transaction": {
                 "to": checksum_to,
                 "value": value_wei,
-                "gasLimit": gas_limit,
+                "gasLimit": fee.gas_limit,
                 "gasPrice": gas_price,
                 "nonce": nonce,
                 "chainId": self.config.chain_id_int,
@@ -814,4 +984,5 @@ class RadiusWalletRuntime:
             "network": self.config.network,
             "explorer_url": f"{self.config.explorer_url}/tx/{tx_hash}",
         }
+        result.update(self._gas_metadata(fee))
         return self._apply_receipt(result, self._wait_for_receipt(tx_hash))

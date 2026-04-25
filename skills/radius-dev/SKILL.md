@@ -31,6 +31,21 @@ Use this Skill when the user asks for:
 
 **Not this Skill:** For programmatic on-chain operations from agent code (balance checks, token transfers, contract calls, and transaction verification), use the **radius-agent-ops** skill. For getting testnet/mainnet tokens, use the **dripping-faucet** skill. For x402 HTTP micropayment protocol integration, use the **x402** skill.
 
+## Optional Tool Adapters
+
+This skill is primarily about building applications, not performing wallet actions directly. Still, some agent environments may expose Radius deterministic tooling through host-specific adapters such as Hermes or OpenClaw.
+
+Use that information as routing guidance:
+
+- for basic wallet actions, prefer the deterministic Radius wallet tools if the host exposes them
+- for app and integration work, continue using the framework-native patterns in this skill
+- if no Radius tools are installed, nothing special is required; use the normal `viem`, `wagmi`, `Foundry`, or `ethers` flows described here
+
+Framework boundary:
+
+- skills are portable across host agents
+- runtime plugins, MCP servers, and deterministic wallet tools are optional host capabilities
+
 ## Default stack decisions (opinionated)
 
 1) **TypeScript: viem (directly, no wrapper SDK)**
@@ -174,6 +189,7 @@ Standard ERC-20 interactions, storage operations, and events work unchanged.
 - Smart contracts: Foundry (`forge` / `cast`) + OpenZeppelin
 - Micropayments: viem + server-side verification + wallet integration
 - x402: Middleware pattern with Radius facilitator for settlement
+- Hosted agent wallet actions: use the host-provided Radius wallet tool surface first when available, otherwise route to **radius-agent-ops**
 
 ### 3. Implement with Radius-specific correctness
 Always be explicit about:

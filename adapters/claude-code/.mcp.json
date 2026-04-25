@@ -4,7 +4,7 @@
       "radius": {
         "command": "python3",
         "args": [
-          "./runtime/radius_wallet_mcp.py"
+          "../../runtimes/python/radius_wallet_mcp.py"
         ]
       }
     }

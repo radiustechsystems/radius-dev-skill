@@ -30,11 +30,36 @@ Perform simple on-chain operations on Radius: check balances, send tokens, deplo
 
 Use this order unless the user requests a specific tool:
 
-1. `cast` (CLI-first for quick actions)
-2. `web3.py` (Python automation fallback)
-3. `viem` (TypeScript automation fallback)
+1. Host-provided deterministic Radius wallet tools, if this agent exposes them
+2. `cast` (CLI-first for quick actions)
+3. `web3.py` (Python automation fallback)
+4. `viem` (TypeScript automation fallback)
 
 Do not require project-specific wallet wrapper libraries for this skill.
+
+## Optional Tool Adapters
+
+Some agent environments may expose Radius wallet tooling through a framework adapter such as:
+
+- Hermes `radius-cast`
+- OpenClaw via an MCP-compatible Radius plugin/bundle
+- another host-specific adapter that preserves the same Radius wallet tool surface
+
+If those tools are available, prefer them for basic wallet operations:
+
+- `radius_wallet_address`
+- `radius_balance`
+- `radius_send_sbc`
+- `radius_send_rusd`
+- `radius_tx_status`
+- `radius_chain_info`
+
+If those tools are not available, fall back to direct `cast` first, then the other general EVM tooling paths in this skill.
+
+Framework boundary:
+
+- skills are portable
+- deterministic runtime tools are optional and depend on the host agent framework
 
 ## Setup and Security
 
@@ -183,6 +208,10 @@ For faucet flows, use the **dripping-faucet** skill.
 - **dripping-faucet** — Advanced faucet flows (signed/unsigned, mainnet, rate limit handling, error mapping)
 - **radius-dev** — dApp development (wagmi, React, Foundry project setup, event watching, micropayment architecture)
 - **x402** — HTTP micropayment protocol (payment gating, EIP-2612 permits, facilitator integration)
+
+### Runtime Surface
+
+If the current agent says it has Radius tools or plugins installed, map the common wallet requests in this skill to the deterministic tool surface first before generating scripts.
 
 ### Live Documentation
 

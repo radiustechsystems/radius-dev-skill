@@ -1,20 +1,25 @@
-# Radius Skills Marketplace
+# Radius Skills
 
 Radius-maintained agent skills for building on the Radius Network.
 
 This repo currently serves two purposes:
 
 - the upstream source of truth for portable Radius skills
-- the install surface for the existing Claude-style `radius-dev` bundle
+- the shared runtime and adapter surface for agent frameworks
 
 The current marketplace bundle id stays `radius-dev` for backward compatibility, but the bundle now spans multiple skills including `radius-dev`, `dripping-faucet`, and `radius-agent-ops`.
 
 ## Repo Layout
 
-- `plugins/radius/skills/*` — source of truth for Radius skills
-- `plugins/radius/runtime/*` — shared deterministic Radius wallet runtime, CLI, and MCP server
-- `plugins/radius/.claude-plugin/plugin.json` — Claude bundle manifest used by the current marketplace package
-- `plugins/radius/.mcp.json` — bundle-scoped MCP config for OpenClaw-compatible loading
+- `skills/*` — source of truth for portable Radius skills
+- `spec/tools.schema.json` — deterministic Radius wallet tool schema
+- `spec/networks.json` — canonical Radius network constants used by runtimes and adapters
+- `spec/golden-tests/*` — skill behavior fixtures and regression prompts
+- `runtimes/python/*` — shared deterministic Radius wallet runtime, CLI, and MCP server
+- `runtimes/typescript/*` — TypeScript runtime target surface
+- `adapters/claude-code/.claude-plugin/plugin.json` — Claude bundle manifest used by the current marketplace package
+- `adapters/claude-code/.mcp.json` — bundle-scoped MCP config
+- `adapters/*` — thin framework adapters over the shared spec and runtimes
 - `.claude-plugin/marketplace.json` — marketplace root metadata
 - `docs/repo-architecture.md` — compatibility boundaries and adapter design rules
 
@@ -49,7 +54,7 @@ openclaw gateway restart
 For local development from a checkout:
 
 ```bash
-openclaw plugins install ./plugins/radius
+openclaw plugins install ./adapters/claude-code
 openclaw gateway restart
 ```
 
@@ -73,13 +78,13 @@ For the current architecture and adapter guidance, see [docs/repo-architecture.m
 
 ## Deterministic Runtime
 
-The shared Radius wallet runtime now lives under `plugins/radius/runtime/`.
+The shared Radius wallet runtime now lives under `runtimes/python/`.
 
 It currently provides:
 
 - a Python runtime API for deterministic wallet operations
 - a stable JSON CLI
-- a stdio MCP server exposed from `plugins/radius/.mcp.json`
+- a stdio MCP server exposed from `adapters/claude-code/.mcp.json`
 
 The current tool surface is:
 
@@ -103,7 +108,7 @@ The upstream Hermes adapter now lives at `adapters/hermes/radius-cast/`.
 It resolves the shared runtime in this order:
 
 - `RADIUS_RUNTIME_ROOT`
-- `RADIUS_SKILLS_DIR/plugins/radius/runtime`
-- `${HERMES_APP_ROOT:-/app}/vendor/radius-skills/plugins/radius/runtime`
+- `RADIUS_SKILLS_DIR/runtimes/python`
+- `${HERMES_APP_ROOT:-/app}/vendor/radius-skills/runtimes/python`
 
 That keeps Hermes-specific session/provider behavior in the adapter while leaving the actual wallet logic in the shared runtime.

@@ -16,7 +16,7 @@
             "author": {
                 "name": "Radius Technology Systems"
             },
-            "source": "./plugins/radius"
+            "source": "./adapters/claude-code"
         }
     ]
 }

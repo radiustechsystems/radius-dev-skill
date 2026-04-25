@@ -1,0 +1,30 @@
+{
+  "networks": {
+    "testnet": {
+      "chainId": 72344,
+      "rpcUrl": "https://rpc.testnet.radiustech.xyz",
+      "explorerUrl": "https://testnet.radiustech.xyz",
+      "faucetApiUrl": "https://testnet.radiustech.xyz/api/v1/faucet",
+      "faucetWebUrl": "https://testnet.radiustech.xyz/wallet"
+    },
+    "mainnet": {
+      "chainId": 723487,
+      "rpcUrl": "https://rpc.radiustech.xyz",
+      "explorerUrl": "https://network.radiustech.xyz",
+      "faucetApiUrl": "https://network.radiustech.xyz/api/v1/faucet",
+      "faucetWebUrl": "https://network.radiustech.xyz/wallet"
+    }
+  },
+  "tokens": {
+    "RUSD": {
+      "type": "native",
+      "decimals": 18
+    },
+    "SBC": {
+      "type": "erc20",
+      "address": "0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb",
+      "decimals": 6
+    }
+  }
+}
+
