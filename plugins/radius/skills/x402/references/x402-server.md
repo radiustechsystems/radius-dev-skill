@@ -27,7 +27,7 @@ export interface X402Config {
   tokenName?: string;
   /** ERC-2612 permit domain version (default: "1") */
   tokenVersion?: string;
-  /** HTTP header carrying the payment (default: "X-Payment") */
+  /** HTTP header carrying the payment (default: "PAYMENT-SIGNATURE") */
   paymentHeader?: string;
 }
 
@@ -46,10 +46,29 @@ export interface PaymentRequirement {
   };
 }
 
-/** The full 402 response body (x402 v2) */
-export interface PaymentRequirementsResponse {
-  paymentRequirements: PaymentRequirement[];
-  x402Version: number;
+/** The x402 v2 payment-required object sent in the PAYMENT-REQUIRED header. */
+export interface PaymentRequired {
+  x402Version: 2;
+  error: string;
+  resource: {
+    url: string;
+    description?: string;
+    mimeType?: string;
+  };
+  accepts: PaymentRequirement[];
+  extensions?: Record<string, unknown>;
+}
+
+/** Settlement metadata sent in the PAYMENT-RESPONSE header. */
+export interface SettlementResponse {
+  success: boolean;
+  transaction?: string;
+  txHash?: string;
+  transactionHash?: string;
+  hash?: string;
+  payer?: string;
+  network: string;
+  errorReason?: string;
 }
 
 /** Options for processPayment behavior */
@@ -62,13 +81,13 @@ export interface PaymentOptions {
 
 /** Every possible outcome of processPayment */
 export type PaymentOutcome =
-  | { status: 'no-payment'; requirements: PaymentRequirementsResponse }
+  | { status: 'no-payment'; paymentRequired: PaymentRequired }
   | { status: 'invalid-header' }
   | { status: 'verify-failed'; detail: any }
   | { status: 'verify-unreachable'; detail: string }
   | { status: 'settle-failed'; detail: any }
   | { status: 'settle-unreachable'; detail: string }
-  | { status: 'settled'; txHash: string | undefined; verifyMs: number; settleMs: number; totalMs: number }
+  | { status: 'settled'; txHash: string | undefined; settlementResponse: SettlementResponse; verifyMs: number; settleMs: number; totalMs: number }
   | { status: 'settle-pending'; verifyMs: number; totalMs: number };
 ```
 
@@ -76,29 +95,64 @@ export type PaymentOutcome =
 
 ## Core functions
 
-### buildPaymentRequirements
+### buildPaymentRequired
 
-Constructs the 402 response body telling clients what payment the server accepts.
+Constructs the x402 v2 `PaymentRequired` object sent to clients in the `PAYMENT-REQUIRED` header.
 
 ```typescript
-export function buildPaymentRequirements(config: X402Config): PaymentRequirementsResponse {
+export function buildPaymentRequirement(config: X402Config): PaymentRequirement {
   return {
-    paymentRequirements: [
-      {
-        scheme: 'exact',
-        network: config.network,
-        amount: config.amount,
-        asset: config.asset,
-        payTo: config.payTo,
-        maxTimeoutSeconds: 300,
-        extra: {
-          name: config.tokenName ?? 'Stable Coin',
-          version: config.tokenVersion ?? '1',
-          assetTransferMethod: 'permit2',
-        },
+    scheme: 'exact',
+    network: config.network,
+    amount: config.amount,
+    asset: config.asset,
+    payTo: config.payTo,
+    maxTimeoutSeconds: 300,
+    extra: {
+      name: config.tokenName ?? 'Stable Coin',
+      version: config.tokenVersion ?? '1',
+      assetTransferMethod: 'permit2',
+    },
+  };
+}
+
+export function buildEip2612GasSponsoringExtension() {
+  return {
+    info: {
+      description: 'The facilitator accepts EIP-2612 gasless Permit to the canonical Permit2 contract.',
+      version: '1',
+    },
+    schema: {
+      $schema: 'https://json-schema.org/draft/2020-12/schema',
+      type: 'object',
+      properties: {
+        from: { type: 'string', pattern: '^0x[a-fA-F0-9]{40}$' },
+        asset: { type: 'string', pattern: '^0x[a-fA-F0-9]{40}$' },
+        spender: { type: 'string', pattern: '^0x[a-fA-F0-9]{40}$' },
+        amount: { type: 'string', pattern: '^[0-9]+$' },
+        nonce: { type: 'string', pattern: '^[0-9]+$' },
+        deadline: { type: 'string', pattern: '^[0-9]+$' },
+        signature: { type: 'string', pattern: '^0x[a-fA-F0-9]+$' },
+        version: { type: 'string', pattern: '^[0-9]+(\\.[0-9]+)*$' },
       },
-    ],
+      required: ['from', 'asset', 'spender', 'amount', 'nonce', 'deadline', 'signature', 'version'],
+    },
+  };
+}
+
+export function buildPaymentRequired(config: X402Config, request: Request): PaymentRequired {
+  return {
     x402Version: 2,
+    error: 'PAYMENT-SIGNATURE header is required',
+    resource: {
+      url: request.url,
+      description: `Access to ${new URL(request.url).pathname}`,
+      mimeType: 'application/json',
+    },
+    accepts: [buildPaymentRequirement(config)],
+    extensions: {
+      eip2612GasSponsoring: buildEip2612GasSponsoringExtension(),
+    },
   };
 }
 ```
@@ -114,12 +168,12 @@ export async function processPayment(
   options?: PaymentOptions,
   ctx?: { waitUntil: (p: Promise<any>) => void },
 ): Promise<PaymentOutcome> {
-  const headerName = config.paymentHeader ?? 'X-Payment';
+  const headerName = config.paymentHeader ?? 'PAYMENT-SIGNATURE';
   const paymentHeader = request.headers.get(headerName);
 
-  // No payment header → return requirements for 402 response
+  // No payment header -> return requirements for the PAYMENT-REQUIRED header.
   if (!paymentHeader) {
-    return { status: 'no-payment', requirements: buildPaymentRequirements(config) };
+    return { status: 'no-payment', paymentRequired: buildPaymentRequired(config, request) };
   }
 
   // Decode the base64-encoded payment payload.
@@ -143,7 +197,7 @@ export async function processPayment(
   const facilitatorBody = JSON.stringify({
     x402Version: 2,
     paymentPayload,
-    paymentRequirements: buildPaymentRequirements(config).paymentRequirements[0],
+    paymentRequirements: buildPaymentRequirement(config),
   });
 
   const t0 = Date.now();
@@ -163,8 +217,8 @@ export async function processPayment(
     }
     verifyMs = Date.now() - t0;
 
-    const verifyData: any = await verifyRes.json();
-    if (!verifyData.isValid) {
+    const verifyData: any = await readFacilitatorJson(verifyRes);
+    if (!verifyRes.ok || !verifyData.isValid) {
       return { status: 'verify-failed', detail: verifyData };
     }
   }
@@ -176,7 +230,7 @@ export async function processPayment(
       headers: facilitatorHeaders,
       body: facilitatorBody,
     })
-      .then((r) => r.json())
+      .then(readFacilitatorJson)
       .catch(() => {});
 
     if (ctx) ctx.waitUntil(settlePromise);
@@ -197,8 +251,8 @@ export async function processPayment(
   }
   const settleMs = Date.now() - t1;
 
-  const settleData: any = await settleRes.json();
-  if (!settleData.success) {
+  const settleData: any = await readFacilitatorJson(settleRes);
+  if (!settleRes.ok || !settleData.success) {
     return { status: 'settle-failed', detail: settleData };
   }
 
@@ -209,7 +263,7 @@ export async function processPayment(
     settleData.transactionHash ??
     settleData.hash;
 
-  return { status: 'settled', txHash, verifyMs, settleMs, totalMs: Date.now() - t0 };
+  return { status: 'settled', txHash, settlementResponse: settleData, verifyMs, settleMs, totalMs: Date.now() - t0 };
 }
 ```
 
@@ -220,20 +274,44 @@ export async function processPayment(
 ```typescript
 /** CORS headers that include the payment header. */
 export function corsHeaders(config?: Partial<X402Config>): Record<string, string> {
-  const header = config?.paymentHeader ?? 'X-Payment';
+  const header = config?.paymentHeader ?? 'PAYMENT-SIGNATURE';
   return {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': `Content-Type, ${header}`,
+    'Access-Control-Expose-Headers': 'PAYMENT-REQUIRED, PAYMENT-RESPONSE',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   };
 }
 
+/** Base64-encode JSON in browser, Workers, or Node.js runtimes. */
+export function encodeBase64Json(data: unknown): string {
+  const json = JSON.stringify(data);
+  if (typeof btoa === 'function') return btoa(json);
+  return Buffer.from(json, 'utf8').toString('base64');
+}
+
 /** JSON response with CORS headers. */
-export function jsonResponse(data: unknown, status = 200, config?: Partial<X402Config>): Response {
+export function jsonResponse(
+  data: unknown,
+  status = 200,
+  config?: Partial<X402Config>,
+  extraHeaders: Record<string, string> = {},
+): Response {
   return Response.json(data, {
     status,
-    headers: { ...corsHeaders(config), 'Content-Type': 'application/json' },
+    headers: { ...corsHeaders(config), 'Content-Type': 'application/json', ...extraHeaders },
   });
+}
+
+/** Parse JSON if present; preserve status/body details for facilitator errors. */
+async function readFacilitatorJson(response: Response): Promise<any> {
+  const text = await response.text();
+  if (!text) return { status: response.status, ok: response.ok };
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { status: response.status, ok: response.ok, body: text };
+  }
 }
 ```
 
@@ -250,16 +328,19 @@ async function handlePaidRequest(request: Request, config: X402Config): Promise<
 
   switch (outcome.status) {
     case 'no-payment':
-      return jsonResponse(outcome.requirements, 402, config);
+      return jsonResponse({}, 402, config, {
+        'PAYMENT-REQUIRED': encodeBase64Json(outcome.paymentRequired),
+      });
 
     case 'invalid-header':
-      return jsonResponse({ error: 'Invalid X-Payment header' }, 400, config);
+      return jsonResponse({ error: 'Invalid PAYMENT-SIGNATURE header' }, 400, config);
 
     case 'verify-failed':
       return jsonResponse(
         { error: 'Payment verification failed', detail: outcome.detail },
         402,
         config,
+        { 'PAYMENT-REQUIRED': encodeBase64Json(buildPaymentRequired(config, request)) },
       );
 
     case 'verify-unreachable':
@@ -273,15 +354,20 @@ async function handlePaidRequest(request: Request, config: X402Config): Promise<
     case 'settle-failed':
       return jsonResponse(
         { error: 'Settlement failed', detail: outcome.detail },
-        502,
+        402,
         config,
+        { 'PAYMENT-RESPONSE': encodeBase64Json(outcome.detail) },
       );
 
     case 'settle-pending':
+      return jsonResponse({ message: 'Payment accepted', path: url.pathname }, 200, config);
+
     case 'settled':
       // Payment accepted — return the paid content
       // Replace with your application logic:
-      return jsonResponse({ message: 'Payment accepted', path: url.pathname }, 200, config);
+      return jsonResponse({ message: 'Payment accepted', path: url.pathname }, 200, config, {
+        'PAYMENT-RESPONSE': encodeBase64Json(outcome.settlementResponse),
+      });
   }
 }
 ```
@@ -299,7 +385,7 @@ export default {
       asset: '0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb',
       network: 'eip155:723487',
       payTo: env.PAYMENT_ADDRESS,
-      facilitatorUrl: 'https://facilitator.andrs.dev',
+      facilitatorUrl: 'https://facilitator.radiustech.xyz',
       facilitatorApiKey: env.FACILITATOR_API_KEY,
       amount: '100',
     };
@@ -324,7 +410,7 @@ const config: X402Config = {
   asset: '0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb',
   network: 'eip155:723487',
   payTo: process.env.PAYMENT_ADDRESS!,
-  facilitatorUrl: 'https://facilitator.andrs.dev',
+  facilitatorUrl: 'https://facilitator.radiustech.xyz',
   amount: '100',
 };
 
@@ -341,19 +427,32 @@ async function x402Gate(req: express.Request, res: express.Response, next: expre
   });
 
   const outcome = await processPayment(config, request);
+  res.set(corsHeaders(config));
 
   if (outcome.status === 'settled' || outcome.status === 'settle-pending') {
+    if (outcome.status === 'settled') {
+      res.set('PAYMENT-RESPONSE', encodeBase64Json(outcome.settlementResponse));
+    }
     next(); // Payment accepted — proceed to route handler
     return;
   }
 
   // Map outcome to HTTP response
   if (outcome.status === 'no-payment') {
-    res.status(402).json(outcome.requirements);
+    res
+      .status(402)
+      .set('PAYMENT-REQUIRED', encodeBase64Json(outcome.paymentRequired))
+      .json({});
   } else if (outcome.status === 'invalid-header') {
-    res.status(400).json({ error: 'Invalid X-Payment header' });
+    res.status(400).json({ error: 'Invalid PAYMENT-SIGNATURE header' });
   } else if (outcome.status === 'verify-failed' || outcome.status === 'settle-failed') {
-    res.status(402).json({ error: 'Payment failed', detail: outcome.detail });
+    const responseHeader = outcome.status === 'settle-failed'
+      ? { 'PAYMENT-RESPONSE': encodeBase64Json(outcome.detail) }
+      : { 'PAYMENT-REQUIRED': encodeBase64Json(buildPaymentRequired(config, request)) };
+    res
+      .status(402)
+      .set(responseHeader)
+      .json({ error: 'Payment failed', detail: outcome.detail });
   } else {
     res.status(502).json({ error: 'Facilitator unavailable' });
   }
@@ -373,7 +472,7 @@ const config: X402Config = {
   asset: '0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb',
   network: 'eip155:723487',
   payTo: process.env.PAYMENT_ADDRESS!,
-  facilitatorUrl: 'https://facilitator.andrs.dev',
+  facilitatorUrl: 'https://facilitator.radiustech.xyz',
   amount: '100',
 };
 
@@ -387,13 +486,29 @@ createServer(async (req, res) => {
 
   const outcome = await processPayment(config, request);
 
+  for (const [key, value] of Object.entries(corsHeaders(config))) {
+    res.setHeader(key, value);
+  }
   res.setHeader('Content-Type', 'application/json');
   if (outcome.status === 'no-payment') {
+    res.setHeader('PAYMENT-REQUIRED', encodeBase64Json(outcome.paymentRequired));
     res.writeHead(402);
-    res.end(JSON.stringify(outcome.requirements));
-  } else if (outcome.status === 'settled' || outcome.status === 'settle-pending') {
+    res.end(JSON.stringify({}));
+  } else if (outcome.status === 'settled') {
+    res.setHeader('PAYMENT-RESPONSE', encodeBase64Json(outcome.settlementResponse));
     res.writeHead(200);
     res.end(JSON.stringify({ data: 'your protected content' }));
+  } else if (outcome.status === 'settle-pending') {
+    res.writeHead(200);
+    res.end(JSON.stringify({ data: 'your protected content' }));
+  } else if (outcome.status === 'verify-failed' || outcome.status === 'settle-failed') {
+    if (outcome.status === 'settle-failed') {
+      res.setHeader('PAYMENT-RESPONSE', encodeBase64Json(outcome.detail));
+    } else {
+      res.setHeader('PAYMENT-REQUIRED', encodeBase64Json(buildPaymentRequired(config, request)));
+    }
+    res.writeHead(402);
+    res.end(JSON.stringify({ error: 'Payment failed', detail: outcome.detail }));
   } else {
     res.writeHead(outcome.status === 'invalid-header' ? 400 : 502);
     res.end(JSON.stringify({ error: outcome.status }));

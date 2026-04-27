@@ -11,8 +11,13 @@ The facilitator is a service that verifies x402 payment signatures and settles t
 
 | Network | Facilitator | URL |
 |---------|-------------|-----|
-| Mainnet (`eip155:723487`) | Anders (Radius team) | `https://facilitator.andrs.dev` |
-| Testnet (`eip155:72344`) | FareSide | `https://facilitator.x402.rs` |
+| Mainnet (`eip155:723487`) | Radius | `https://facilitator.radiustech.xyz` |
+| Testnet (`eip155:72344`) | Radius | `https://facilitator.testnet.radiustech.xyz` |
+
+Alternative third-party facilitators include Stablecoin.xyz (`https://x402.stablecoin.xyz`),
+FareSide (`https://facilitator.x402.rs`, testnet only), and Middlebit (`https://middlebit.com`,
+mainnet routing). Verify `/supported` and response behavior before using a third-party
+facilitator.
 
 ---
 
@@ -41,7 +46,7 @@ Check if the facilitator is running.
 
 Returns what payment kinds and extensions the facilitator supports.
 
-**Response (facilitator.andrs.dev, 2026-04-06):**
+**Response (Radius mainnet facilitator):**
 ```json
 {
   "kinds": [
@@ -90,8 +95,8 @@ Validates a payment signature without submitting anything on-chain. Use this to 
 }
 ```
 
-- `paymentPayload` is the decoded content of the client's `X-Payment` header (the full payload object).
-- `paymentRequirements` is a **single** requirement object (not the array — extract `paymentRequirements[0]` from the 402 response).
+- `paymentPayload` is the decoded content of the client's `PAYMENT-SIGNATURE` header (the full payload object).
+- `paymentRequirements` is a **single** requirement object from the server's own config (the same object the server advertised in the `PAYMENT-REQUIRED` header's `accepts` array).
 
 **Headers:**
 - `Content-Type: application/json` (required)
@@ -166,8 +171,8 @@ const txHash =
 | Zod validation error (missing fields) | Payload missing required fields (`x402Version`, `accepted`, `payload` in paymentPayload; `amount`, `asset`, `payTo` in paymentRequirements) | Check payload structure matches spec |
 | HTTP 404 or connection refused | Wrong facilitator URL | Verify the URL and check `/health` first |
 
-> **FareSide (`facilitator.x402.rs`) differences:**
+> **Third-party facilitator differences:**
 > - `/supported` response puts `extensions` inside `extra` instead of `assetTransferMethod`, `name`, `version`. The payment signing flow is the same — this only affects parsing `/supported`.
 > - `/health` returns an HTML page, not JSON. Do not parse it as JSON.
 > - `/verify` may return HTTP 412 (Precondition Failed) instead of 200 with `{isValid: false}` for certain errors (e.g., insufficient Permit2 allowance).
-> - **Does not process EIP-2612 gas sponsoring.** Fresh wallets must pre-approve the Permit2 contract before their first x402 payment. See [x402-client.md](x402-client.md) for a Permit2 approval helper.
+> - Some facilitators do not process EIP-2612 gas sponsoring. Fresh wallets may need to pre-approve the Permit2 contract before their first x402 payment. See [x402-client.md](x402-client.md) for a Permit2 approval helper.
