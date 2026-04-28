@@ -1,0 +1,21 @@
+{
+  "name": "Send SBC on Mainnet (Network Targeting)",
+  "skills": ["radius-agent-ops"],
+  "query": "Send 0.2 SBC to 0x742d35Cc6634C0532925a3b844Bc9e7595f2bD68 on Radius mainnet.",
+  "context": "User explicitly requests mainnet operation. Agent must not default to testnet.",
+  "expected_behavior": [
+    "Chooses a valid general-tooling path (cast, web3.py, or viem)",
+    "Switches to mainnet RPC (https://rpc.radiustech.xyz) and mainnet chain ID (723487)",
+    "Uses SBC ERC-20 transfer path with 6-decimal conversion (0.2 SBC = 200000 base units)",
+    "Waits for receipt and checks status",
+    "Returns mainnet explorer URL (https://network.radiustech.xyz/tx/<hash>)",
+    "Does not require radius-wallet-py or radius-wallet-ts"
+  ],
+  "success_criteria": [
+    "Mainnet network constants are used correctly",
+    "SBC amount conversion is correct for 0.2",
+    "Receipt-based confirmation is present",
+    "Mainnet explorer URL is reported",
+    "No mandatory Radius wallet wrapper dependency appears"
+  ]
+}

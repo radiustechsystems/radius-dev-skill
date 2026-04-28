@@ -1,0 +1,7 @@
+{
+  "name": "@radius/agent-pi-adapter",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Pi adapter scaffold for Radius wallet capabilities"
+}
+

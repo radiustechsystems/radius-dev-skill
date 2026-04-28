@@ -1,0 +1,27 @@
+{
+  "name": "Send SBC on Testnet",
+  "skills": ["radius-agent-ops"],
+  "query": "Send 0.5 SBC to 0x742d35Cc6634C0532925a3b844Bc9e7595f2bD68 on Radius testnet",
+  "context": "User has RADIUS_PRIVATE_KEY set in environment and wants to transfer SBC on testnet. The agent should use general EVM tooling (cast, web3.py, or viem) and must not require radius-wallet-py or radius-wallet-ts.",
+  "expected_behavior": [
+    "Chooses a valid general-tooling path (cast, web3.py, or viem)",
+    "Targets Radius testnet RPC (https://rpc.testnet.radiustech.xyz) unless user explicitly overrides",
+    "Converts 0.5 SBC to 500000 base units (6 decimals)",
+    "Submits ERC-20 transfer to SBC contract 0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb",
+    "Waits for transaction receipt/confirmation",
+    "Checks receipt success/failure status",
+    "Returns transaction hash and explorer URL",
+    "Never logs or displays the private key",
+    "Does not install, require, or mandate radius-wallet-py/radius-wallet-ts"
+  ],
+  "success_criteria": [
+    "A valid non-Radius-wallet tooling path is used (cast OR web3.py OR viem)",
+    "No step requires radius-wallet-py or radius-wallet-ts",
+    "Transfer call uses recipient 0x742d35Cc6634C0532925a3b844Bc9e7595f2bD68 and amount equivalent to 0.5 SBC",
+    "Transaction is explicitly confirmed via receipt (not assumed instant)",
+    "Receipt status is checked for success/failure",
+    "Explorer URL is generated and returned",
+    "Private key is never printed, logged, or hardcoded",
+    "Testnet network is used by default (mainnet constants absent unless explicitly requested)"
+  ]
+}

@@ -1,0 +1,5 @@
+[skills]
+paths = ["../../skills"]
+
+[radius.runtime]
+python = "../../runtimes/python"

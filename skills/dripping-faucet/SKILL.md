@@ -19,6 +19,25 @@ Request tokens from a Radius Network faucet. Handles unsigned and signed drip re
 - User asks how to get test funds on Radius
 - User mentions "mainnet faucet", "mainnet tokens", or "fund on mainnet"
 
+**Related Skills:** For on-chain operations after funding (balance checks, token transfers, contract deployment), use the **radius-agent-ops** skill. For dApp development, use the **radius-dev** skill.
+
+## Optional Tool Adapters
+
+Some agent environments may expose Radius wallet tools through a framework adapter such as Hermes or an MCP-compatible host.
+
+Use those tools only where they help around the faucet flow:
+
+- to inspect the wallet address before funding
+- to verify balances after a drip
+- to confirm follow-up sends or status checks after funding
+
+Do not require those tools for the faucet itself. The faucet flow in this skill must still work when no Radius plugin or MCP adapter is installed.
+
+Framework boundary:
+
+- this skill is portable
+- deterministic Radius wallet tools are optional host capabilities
+
 ## Network Selection
 
 Determine the target network **before** doing anything else — it controls the faucet URL, the RPC endpoint, the chain ID, and the expected behaviour.

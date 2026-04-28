@@ -1,0 +1,7 @@
+{
+  "name": "radius-dev",
+  "description": "Legacy Radius bundle id for compatibility; includes Radius development, faucet, and agent wallet operation skills",
+  "author": {
+    "name": "Radius Technology Systems"
+  }
+}

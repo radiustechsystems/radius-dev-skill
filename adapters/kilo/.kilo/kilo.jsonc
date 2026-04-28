@@ -1,0 +1,6 @@
+{
+  // Kilo adapter scaffold for Radius skills.
+  "name": "radius-wallet",
+  "skills": ["radius-dev", "dripping-faucet", "radius-agent-ops"]
+}
+

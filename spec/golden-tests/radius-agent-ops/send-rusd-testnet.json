@@ -1,0 +1,24 @@
+{
+  "name": "Send Native RUSD on Testnet",
+  "skills": ["radius-agent-ops"],
+  "query": "Send 0.001 RUSD to 0x742d35Cc6634C0532925a3b844Bc9e7595f2bD68 on Radius testnet and confirm if it succeeded.",
+  "context": "User wants a simple native transfer and confirmation flow. RADIUS_PRIVATE_KEY is set in environment.",
+  "expected_behavior": [
+    "Chooses a valid general-tooling path (cast, web3.py, or viem)",
+    "Uses testnet RPC and chain defaults unless overridden",
+    "Treats RUSD as native token transfer (not ERC-20 transfer)",
+    "Converts 0.001 RUSD to 1000000000000000 wei for transaction value",
+    "Submits transaction and waits for receipt",
+    "Checks receipt status for success/failure",
+    "Returns tx hash and explorer URL",
+    "Does not require radius-wallet-py or radius-wallet-ts"
+  ],
+  "success_criteria": [
+    "Native send path is used correctly",
+    "Wei conversion is correct for 0.001 RUSD",
+    "Receipt confirmation is performed explicitly",
+    "Success/failure is reported based on receipt status",
+    "Private key is never printed or embedded in output",
+    "No mandatory Radius wallet wrapper dependency appears"
+  ]
+}

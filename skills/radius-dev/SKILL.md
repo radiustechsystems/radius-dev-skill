@@ -1,7 +1,15 @@
 ---
 name: radius-dev
-description: End-to-end Radius Network development playbook. Stablecoin-native EVM with sub-second finality. Uses plain viem (defineChain, createPublicClient, createWalletClient) for all TypeScript integration. wagmi for React wallet integration. Foundry for smart contract development and testing. Also covers Hardhat/ethers.js compatibility and EIP-7966 synchronous transactions. Micropayment patterns (pay-per-visit content, real-time API metering, streaming payments), x402 protocol integration, Radius x402 facilitators (Permit2 + EIP-2612), stablecoin-native fees via Turnstile, ERC-20 operations, event watching, production gotchas, and EVM compatibility differences from Ethereum.
 published: true
+description: |
+  End-to-end Radius Network application development playbook. This skill should be used
+  when building dApps, frontends, or backend services that integrate with Radius using
+  viem, wagmi, or Foundry. Covers React/Next.js with wagmi for wallet connection, plain
+  viem for TypeScript integration (defineChain, createPublicClient, createWalletClient),
+  Foundry for smart contract project setup, testing, and deployment, Hardhat/ethers.js compatibility,
+  EIP-7966 synchronous transactions, micropayment patterns (pay-per-visit, API metering,
+  streaming), event watching, production gotchas, and EVM compatibility differences from
+  Ethereum. Not for simple on-chain operations from agent code (use radius-agent-ops).
 user-invocable: true
 ---
 
@@ -10,17 +18,34 @@ user-invocable: true
 ## What this Skill is for
 Use this Skill when the user asks for:
 - Radius dApp UI work (React / Next.js with wagmi)
-- Wallet connection + transaction signing on Radius
-- Smart contract deployment to Radius (Foundry / Solidity)
+- Wallet connection + transaction signing on Radius (wagmi, MetaMask)
+- Smart contract project setup, testing, and deployment with Foundry
 - Micropayment patterns (pay-per-visit content, API metering, streaming payments)
 - x402 protocol integration (per-request API billing, facilitator patterns)
 - TypeScript integration with viem (clients, transactions, contract interaction, events)
 - EVM compatibility questions specific to Radius
 - Stablecoin-native fee model and Turnstile mechanism
-- Radius network configuration, RPC endpoints, contract addresses
+- Event watching and log querying on Radius
 - Production gotchas (wallet compatibility, nonce management, decimal handling)
 - Hardhat or ethers.js integration with Radius
 - JSON-RPC differences and Radius-specific extensions (EIP-7966, `rad_getBalanceRaw`)
+
+**Not this Skill:** For programmatic on-chain operations from agent code (balance checks, token transfers, contract calls, and transaction verification), use the **radius-agent-ops** skill. For getting testnet/mainnet tokens, use the **dripping-faucet** skill. For x402 HTTP micropayment protocol integration, use the **x402** skill.
+
+## Optional Tool Adapters
+
+This skill is primarily about building applications, not performing wallet actions directly. Still, some agent environments may expose Radius deterministic tooling through host-specific adapters such as Hermes or OpenClaw.
+
+Use that information as routing guidance:
+
+- for basic wallet actions, prefer the deterministic Radius wallet tools if the host exposes them
+- for app and integration work, continue using the framework-native patterns in this skill
+- if no Radius tools are installed, nothing special is required; use the normal `viem`, `wagmi`, `Foundry`, or `ethers` flows described here
+
+Framework boundary:
+
+- skills are portable across host agents
+- runtime plugins, MCP servers, and deterministic wallet tools are optional host capabilities
 
 ## Default stack decisions (opinionated)
 
@@ -165,6 +190,7 @@ Standard ERC-20 interactions, storage operations, and events work unchanged.
 - Smart contracts: Foundry (`forge` / `cast`) + OpenZeppelin
 - Micropayments: viem + server-side verification + wallet integration
 - x402: Middleware pattern with Radius facilitator for settlement (Permit2 or EIP-2612) — see the **x402** skill for full implementation details
+- Hosted agent wallet actions: use the host-provided Radius wallet tool surface first when available, otherwise route to **radius-agent-ops**
 
 ### 3. Implement with Radius-specific correctness
 Always be explicit about:

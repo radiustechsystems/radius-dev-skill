@@ -1,0 +1,22 @@
+{
+  "name": "Check Balances on Testnet (Beginner-Friendly)",
+  "skills": ["radius-agent-ops"],
+  "query": "Check my wallet balances on Radius testnet and explain them in plain English.",
+  "context": "User is not blockchain-native. RADIUS_PRIVATE_KEY is set. They want a simple balance check, not app development.",
+  "expected_behavior": [
+    "Chooses a valid general-tooling path (cast, web3.py, or viem)",
+    "Uses testnet RPC by default (https://rpc.testnet.radiustech.xyz)",
+    "Derives wallet address from signing key without printing the key",
+    "Fetches native RUSD balance and SBC ERC-20 balance",
+    "Explains balances with units (RUSD, SBC) in human-readable format",
+    "Mentions SBC uses 6 decimals and RUSD uses 18 decimals when relevant",
+    "Does not require radius-wallet-py or radius-wallet-ts"
+  ],
+  "success_criteria": [
+    "A valid non-Radius-wallet tooling path is used",
+    "Both RUSD and SBC balances are retrieved",
+    "Output is understandable to a beginner and includes units",
+    "Private key is never printed, logged, or hardcoded",
+    "Testnet constants are used unless user explicitly requests another network"
+  ]
+}

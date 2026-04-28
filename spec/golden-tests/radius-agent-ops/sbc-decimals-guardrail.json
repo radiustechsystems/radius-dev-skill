@@ -1,0 +1,21 @@
+{
+  "name": "SBC Decimal Guardrail (Correct User Mistake)",
+  "skills": ["radius-agent-ops"],
+  "query": "Send 1 SBC to 0x742d35Cc6634C0532925a3b844Bc9e7595f2bD68 on testnet. I think 1 SBC is 1000000000000000000 base units.",
+  "context": "User is confused about decimals. Agent should prevent an overpayment mistake.",
+  "expected_behavior": [
+    "Detects and corrects decimal misunderstanding",
+    "Explains SBC uses 6 decimals, so 1 SBC = 1000000 base units",
+    "Uses corrected amount in transaction path",
+    "Confirms transaction with receipt and status check",
+    "Communicates correction clearly and non-judgmentally",
+    "Does not require radius-wallet-py or radius-wallet-ts"
+  ],
+  "success_criteria": [
+    "Incorrect 1e18 SBC conversion is not used",
+    "Correct 1e6 SBC base-unit value is used for send",
+    "Receipt verification is included",
+    "Beginner-friendly explanation is provided",
+    "No mandatory Radius wallet wrapper dependency appears"
+  ]
+}

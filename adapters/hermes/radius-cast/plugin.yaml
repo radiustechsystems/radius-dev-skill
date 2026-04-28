@@ -1,0 +1,10 @@
+name: radius-cast
+version: "1.1.0"
+description: "Hermes adapter for deterministic Radius wallet tools backed by the shared Radius runtime"
+provides_tools:
+  - radius_wallet_address
+  - radius_balance
+  - radius_send_sbc
+  - radius_send_rusd
+  - radius_tx_status
+  - radius_chain_info

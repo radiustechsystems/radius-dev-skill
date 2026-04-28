@@ -5,18 +5,18 @@
         "name": "Radius Technology Systems"
     },
     "metadata": {
-        "version": "0.0.3",
-        "description": "Claude Code plugins from Radius Technology Systems for AI-assisted blockchain development on the Radius Network"
+        "version": "0.0.4",
+        "description": "Radius agent skills marketplace for Claude-compatible bundles, with OpenClaw-compatible skill bundle packaging"
     },
     "plugins": [
         {
             "name": "radius-dev",
             "version": "0.0.2",
-            "description": "Radius Network development tools — blockchain development playbook and testnet faucet",
+            "description": "Legacy Radius bundle id for compatibility; includes Radius development, x402, faucet, and agent wallet operation skills",
             "author": {
                 "name": "Radius Technology Systems"
             },
-            "source": "./plugins/radius"
+            "source": "./adapters/claude-code"
         }
     ]
 }

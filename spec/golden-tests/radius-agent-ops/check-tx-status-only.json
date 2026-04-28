@@ -1,0 +1,22 @@
+{
+  "name": "Check Transaction Status from Hash Only",
+  "skills": ["radius-agent-ops"],
+  "query": "Did this transaction succeed on Radius testnet? 0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "context": "User only has a transaction hash and wants a simple yes/no plus a link.",
+  "expected_behavior": [
+    "Chooses a valid general-tooling path (cast, web3.py, or viem)",
+    "Calls transaction receipt endpoint via tooling",
+    "Handles both confirmed and pending cases",
+    "Reports status clearly (success, reverted, or pending)",
+    "Returns explorer URL for the hash",
+    "Does not require wallet creation or token transfer steps",
+    "Does not require radius-wallet-py or radius-wallet-ts"
+  ],
+  "success_criteria": [
+    "Receipt lookup is performed from tx hash",
+    "Result is not guessed without receipt evidence",
+    "Explorer link is returned in correct testnet format",
+    "Output is simple and understandable for non-blockchain users",
+    "No mandatory Radius wallet wrapper dependency appears"
+  ]
+}
