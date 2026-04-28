@@ -114,6 +114,24 @@ It resolves the shared runtime in this order:
 
 That keeps Hermes-specific session/provider behavior in the adapter while leaving the actual wallet logic in the shared runtime.
 
+### Hermes install smoke tests
+
+Hermes users can verify that the skills and deterministic tools install together from a checkout:
+
+```bash
+python3 scripts/hermes_install_smoke.py
+python3 -m unittest discover -s tests/hermes -v
+```
+
+These tests simulate the Hermes install shape by copying `adapters/hermes/radius-cast` into a temporary `HERMES_HOME/plugins` directory, pointing `RADIUS_SKILLS_DIR` at the repo, and verifying that:
+
+- `radius-dev`, `x402`, `dripping-faucet`, and `radius-agent-ops` are present as portable skills
+- `radius_wallet_address`, `radius_balance`, `radius_send_sbc`, `radius_send_rusd`, `radius_tx_status`, and `radius_chain_info` register as Hermes tools
+- the shared Python runtime is available to the Hermes adapter
+- per-call mainnet routing and pending transaction status behavior work without live wallet credentials
+
+The webhook subscriber notification path is intentionally not covered by these tests.
+
 ## Hermes Subscriber Publishing
 
 This repo can publish a GitHub `push`-shaped webhook to Hermes agents that were deployed from the Radius Hermes Railway Template with webhook-based skills sync enabled.

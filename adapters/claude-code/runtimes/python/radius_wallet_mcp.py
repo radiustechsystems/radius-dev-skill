@@ -61,6 +61,11 @@ TOOLS = [
                     "enum": ["local", "para"],
                     "description": "Wallet provider override. Defaults to local.",
                 },
+                "network": {
+                    "type": "string",
+                    "enum": ["testnet", "mainnet"],
+                    "description": "Optional network override for this write. Defaults to runtime env/testnet.",
+                },
                 "to": {
                     "type": "string",
                     "description": "Recipient EVM address.",
@@ -83,6 +88,11 @@ TOOLS = [
                     "type": "string",
                     "enum": ["local", "para"],
                     "description": "Wallet provider override. Defaults to local.",
+                },
+                "network": {
+                    "type": "string",
+                    "enum": ["testnet", "mainnet"],
+                    "description": "Optional network override for this write. Defaults to runtime env/testnet.",
                 },
                 "to": {
                     "type": "string",
@@ -163,6 +173,7 @@ def _handle_tool_call(runtime: RadiusWalletRuntime, name: str, arguments: dict |
                 to_address=str(args.get("to") or ""),
                 amount_sbc=str(args.get("amount_sbc") or ""),
                 provider=args.get("provider", "local"),
+                network=args.get("network"),
             )
         )
     if name == "radius_send_rusd":
@@ -171,6 +182,7 @@ def _handle_tool_call(runtime: RadiusWalletRuntime, name: str, arguments: dict |
                 to_address=str(args.get("to") or ""),
                 amount_rusd=str(args.get("amount_rusd") or ""),
                 provider=args.get("provider", "local"),
+                network=args.get("network"),
             )
         )
     if name == "radius_tx_status":
