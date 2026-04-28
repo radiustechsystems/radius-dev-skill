@@ -15,12 +15,11 @@ The current marketplace bundle id stays `radius-dev` for backward compatibility,
 - `spec/tools.schema.json` — deterministic Radius wallet tool schema
 - `spec/networks.json` — canonical Radius network constants used by runtimes and adapters
 - `spec/golden-tests/*` — skill behavior fixtures and regression prompts
-- `runtimes/python/*` — shared deterministic Radius wallet runtime, CLI, and MCP server
-- `runtimes/typescript/*` — TypeScript runtime target surface
-- `adapters/claude-code/.claude-plugin/plugin.json` — Claude bundle manifest used by the current marketplace package
-- `adapters/claude-code/skills/*` and `adapters/claude-code/runtimes/python/*` — materialized Claude plugin payload for marketplace installs
-- `adapters/claude-code/.mcp.json` — bundle-scoped MCP config
-- `adapters/*` — thin framework adapters over the shared spec and runtimes
+- `runtime/python/*` — shared deterministic Radius wallet runtime, CLI, and MCP server
+- `runtime/typescript/*` — TypeScript runtime target surface
+- `.claude-plugin/plugin.json` — Claude bundle manifest used by the current marketplace package
+- `.mcp.json` — bundle-scoped MCP config pointing at `runtime/python/radius_wallet_mcp.py`
+- `adapters/*` — thin framework adapters over the shared spec and runtime
 - `.claude-plugin/marketplace.json` — marketplace root metadata
 - `docs/repo-architecture.md` — compatibility boundaries and adapter design rules
 
@@ -29,7 +28,7 @@ The current marketplace bundle id stays `radius-dev` for backward compatibility,
 | Surface | Status | Notes |
 | --- | --- | --- |
 | Claude Code bundle | Supported | Current install path. The legacy bundle id `radius-dev` remains stable for existing users. |
-| OpenClaw bundle | Supported for skills, experimental for deterministic tools | OpenClaw can ingest Claude bundles and map skill content from them. This repo now ships a bundle-scoped MCP runtime for Radius wallet tools, but that path still needs end-to-end framework verification. |
+| OpenClaw bundle | Supported for skills, experimental for deterministic tools | OpenClaw can ingest Claude bundles and map skill content from them. This repo now ships a root bundle-scoped MCP runtime for Radius wallet tools, but that path still needs end-to-end framework verification. |
 | Hermes external skills | Supported downstream | Hermes templates can consume this repo as external skill roots today. |
 | Hermes native tool adapter | Supported upstream | Source now lives in `adapters/hermes/radius-cast` and wraps the shared runtime instead of owning wallet logic. |
 | Other frameworks | Untested | Document the pattern, but do not claim support until verified. |
@@ -55,7 +54,7 @@ openclaw gateway restart
 For local development from a checkout:
 
 ```bash
-openclaw plugins install ./adapters/claude-code
+openclaw plugins install .
 openclaw gateway restart
 ```
 
@@ -79,13 +78,13 @@ For the current architecture and adapter guidance, see [docs/repo-architecture.m
 
 ## Deterministic Runtime
 
-The shared Radius wallet runtime now lives under `runtimes/python/`.
+The shared Radius wallet runtime now lives under `runtime/python/`.
 
 It currently provides:
 
 - a Python runtime API for deterministic wallet operations
 - a stable JSON CLI
-- a stdio MCP server exposed from `adapters/claude-code/.mcp.json`
+- a stdio MCP server exposed from `.mcp.json`
 
 The current tool surface is:
 
@@ -109,8 +108,8 @@ The upstream Hermes adapter now lives at `adapters/hermes/radius-cast/`.
 It resolves the shared runtime in this order:
 
 - `RADIUS_RUNTIME_ROOT`
-- `RADIUS_SKILLS_DIR/runtimes/python`
-- `${HERMES_APP_ROOT:-/app}/vendor/radius-skills/runtimes/python`
+- `RADIUS_SKILLS_DIR/runtime/python`
+- `${HERMES_APP_ROOT:-/app}/vendor/radius-skills/runtime/python`
 
 That keeps Hermes-specific session/provider behavior in the adapter while leaving the actual wallet logic in the shared runtime.
 

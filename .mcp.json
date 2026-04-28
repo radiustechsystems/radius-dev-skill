@@ -4,7 +4,7 @@
       "radius": {
         "command": "python3",
         "args": [
-          "${CLAUDE_PLUGIN_ROOT}/runtimes/python/radius_wallet_mcp.py"
+          "${CLAUDE_PLUGIN_ROOT}/runtime/python/radius_wallet_mcp.py"
         ],
         "env": {
           "RADIUS_STATE_DIR": "${RADIUS_STATE_DIR}",

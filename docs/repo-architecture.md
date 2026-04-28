@@ -59,7 +59,7 @@ When the same deterministic capability needs to exist across more than one frame
 
 Framework adapters should stay thin and call the shared runtime instead of re-implementing business logic.
 
-The current implementation lives at `runtimes/python/` so it can be consumed by both:
+The current implementation lives at `runtime/python/` so it can be consumed by both:
 
 - Hermes-native adapters
 - MCP loading via `adapters/claude-code/.mcp.json`
@@ -78,8 +78,8 @@ The current Hermes adapter source lives at `adapters/hermes/radius-cast/`.
 It resolves the shared runtime from:
 
 - `RADIUS_RUNTIME_ROOT`
-- `RADIUS_SKILLS_DIR/runtimes/python`
-- `${HERMES_APP_ROOT}/vendor/radius-skills/runtimes/python`
+- `RADIUS_SKILLS_DIR/runtime/python`
+- `${HERMES_APP_ROOT}/vendor/radius-skills/runtime/python`
 
 ## OpenClaw Adapter Guidance
 

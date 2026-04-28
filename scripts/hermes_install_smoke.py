@@ -43,7 +43,7 @@ def main() -> int:
         hermes_home = tmp_path / ".hermes"
         skills_dir = tmp_path / "external-skills" / "radius-skills"
         plugin_dir = hermes_home / "plugins" / "radius-cast"
-        runtime_dir = skills_dir / "runtimes" / "python"
+        runtime_dir = skills_dir / "runtime" / "python"
         shutil.copytree(repo_root, skills_dir, ignore=shutil.ignore_patterns(".git", "__pycache__", "*.pyc"))
         shutil.copytree(skills_dir / "adapters" / "hermes" / "radius-cast", plugin_dir)
         env = os.environ.copy()

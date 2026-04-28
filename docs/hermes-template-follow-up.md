@@ -16,7 +16,7 @@ Update the Hermes Railway template so it consumes the upstream Radius wallet plu
 The source of truth now lives in the skills repo:
 
 - Hermes adapter: `adapters/hermes/radius-cast/`
-- Shared deterministic runtime: `runtimes/python/`
+- Shared deterministic runtime: `runtime/python/`
 - MCP surface: `adapters/claude-code/.mcp.json`
 
 ## Desired Outcome
@@ -73,8 +73,8 @@ Instead, install the Hermes adapter from the vendored skills repo path:
 That adapter is expected to resolve the shared runtime from:
 
 - `RADIUS_RUNTIME_ROOT`
-- `RADIUS_SKILLS_DIR/runtimes/python`
-- `${HERMES_APP_ROOT:-/app}/vendor/radius-skills/runtimes/python`
+- `RADIUS_SKILLS_DIR/runtime/python`
+- `${HERMES_APP_ROOT:-/app}/vendor/radius-skills/runtime/python`
 
 Because the template already vendors upstream skills under `/app/vendor/radius-skills`, the adapter should work without extra glue if that path is preserved.
 
@@ -84,7 +84,7 @@ Do not copy the runtime logic into the template repo.
 
 The shared runtime should remain upstream at:
 
-- `/app/vendor/radius-skills/runtimes/python`
+- `/app/vendor/radius-skills/runtime/python`
 
 If the install path changes, set `RADIUS_RUNTIME_ROOT` explicitly so the Hermes adapter can find it.
 

@@ -50,7 +50,7 @@ class HermesInstallLayoutTests(unittest.TestCase):
             env = {
                 "HERMES_HOME": str(Path(tmp) / ".hermes"),
                 "RADIUS_SKILLS_DIR": str(REPO_ROOT),
-                "RADIUS_RUNTIME_ROOT": str(REPO_ROOT / "runtimes" / "python"),
+                "RADIUS_RUNTIME_ROOT": str(REPO_ROOT / "runtime" / "python"),
             }
             with patch.dict(os.environ, env, clear=False):
                 module = _load_module(
@@ -70,9 +70,9 @@ class HermesInstallLayoutTests(unittest.TestCase):
             tmp_path = Path(tmp)
             hermes_home = tmp_path / ".hermes"
             plugin_dir = hermes_home / "plugins" / "radius-cast"
-            runtime_dir = tmp_path / "external-skills" / "radius-skills" / "runtimes" / "python"
+            runtime_dir = tmp_path / "external-skills" / "radius-skills" / "runtime" / "python"
             shutil.copytree(REPO_ROOT / "adapters" / "hermes" / "radius-cast", plugin_dir)
-            shutil.copytree(REPO_ROOT / "runtimes" / "python", runtime_dir)
+            shutil.copytree(REPO_ROOT / "runtime" / "python", runtime_dir)
 
             env = {
                 "HERMES_HOME": str(hermes_home),
@@ -87,7 +87,7 @@ class HermesInstallLayoutTests(unittest.TestCase):
         self.assertEqual(EXPECTED_TOOLS, registered)
 
     def test_radius_wallet_runtime_supports_mainnet_override_and_pending_receipts(self):
-        sys.path.insert(0, str(REPO_ROOT / "runtimes" / "python"))
+        sys.path.insert(0, str(REPO_ROOT / "runtime" / "python"))
         try:
             from radius_wallet_runtime import RadiusWalletRuntime
         finally:
@@ -121,23 +121,29 @@ class HermesInstallLayoutTests(unittest.TestCase):
         self.assertIn("https://rpc.radiustech.xyz", run_cast.call_args.args[0])
         self.assertNotIn("--private-key", run_cast.call_args.args[0])
 
-    def test_portable_skills_and_hermes_bundle_payload_are_complete(self):
+    def test_portable_skills_runtime_and_claude_root_payload_are_complete_without_duplication(self):
         for skill_name in EXPECTED_SKILLS:
             self.assertTrue((REPO_ROOT / "skills" / skill_name / "SKILL.md").exists(), skill_name)
-            self.assertTrue(
-                (REPO_ROOT / "adapters" / "claude-code" / "skills" / skill_name / "SKILL.md").exists(),
-                skill_name,
-            )
 
         for runtime_file in ("__init__.py", "radius_wallet_cli.py", "radius_wallet_mcp.py", "radius_wallet_runtime.py"):
-            self.assertTrue((REPO_ROOT / "runtimes" / "python" / runtime_file).exists(), runtime_file)
-            self.assertTrue(
-                (REPO_ROOT / "adapters" / "claude-code" / "runtimes" / "python" / runtime_file).exists(),
-                runtime_file,
-            )
+            self.assertTrue((REPO_ROOT / "runtime" / "python" / runtime_file).exists(), runtime_file)
+
+        self.assertTrue((REPO_ROOT / ".claude-plugin" / "plugin.json").exists())
+        self.assertTrue((REPO_ROOT / ".mcp.json").exists())
+        self.assertFalse((REPO_ROOT / "adapters" / "claude-code" / "skills").exists())
+        self.assertFalse((REPO_ROOT / "adapters" / "claude-code" / "runtime").exists())
+        self.assertFalse((REPO_ROOT / "adapters" / "claude-code" / "runtimes").exists())
+
+        marketplace = json.loads((REPO_ROOT / ".claude-plugin" / "marketplace.json").read_text(encoding="utf-8"))
+        self.assertEqual(marketplace["plugins"][0]["source"], ".")
+        mcp = json.loads((REPO_ROOT / ".mcp.json").read_text(encoding="utf-8"))
+        self.assertEqual(
+            mcp["mcp"]["servers"]["radius"]["args"],
+            ["${CLAUDE_PLUGIN_ROOT}/runtime/python/radius_wallet_mcp.py"],
+        )
 
     def test_tool_schema_and_mcp_surface_stay_in_sync(self):
-        sys.path.insert(0, str(REPO_ROOT / "runtimes" / "python"))
+        sys.path.insert(0, str(REPO_ROOT / "runtime" / "python"))
         try:
             import radius_wallet_mcp
         finally:

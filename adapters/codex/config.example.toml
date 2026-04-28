@@ -2,4 +2,4 @@
 paths = ["../../skills"]
 
 [radius.runtime]
-python = "../../runtimes/python"
+python = "../../runtime/python"
