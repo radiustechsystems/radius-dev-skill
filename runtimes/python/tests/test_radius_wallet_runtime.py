@@ -49,7 +49,7 @@ class RadiusWalletRuntimeTests(unittest.TestCase):
             "sbc_raw": "0",
         }
         with (
-            patch.object(runtime, "_read_private_key", return_value=PRIVATE_KEY),
+            patch.object(runtime, "_signer_args", return_value=["--account", "radius-dev"]),
             patch.object(runtime, "_resolve_local_wallet_address", return_value=FROM_ADDRESS),
             patch.object(runtime, "_cast_balance", return_value=balance),
             patch.object(runtime, "_run_cast", return_value=TX_HASH) as run_cast,
@@ -61,6 +61,8 @@ class RadiusWalletRuntimeTests(unittest.TestCase):
         send_args = run_cast.call_args.args[0]
         self.assertNotIn("--gas-limit", send_args)
         self.assertNotIn("--gas-price", send_args)
+        self.assertNotIn("--private-key", send_args)
+        self.assertIn("--account", send_args)
         self.assertEqual(result["tx_hash"], TX_HASH)
         rpc_request.assert_not_called()
 
@@ -74,7 +76,7 @@ class RadiusWalletRuntimeTests(unittest.TestCase):
             "sbc_raw": "1000000",
         }
         with (
-            patch.object(runtime, "_read_private_key", return_value=PRIVATE_KEY),
+            patch.object(runtime, "_signer_args", return_value=["--account", "radius-dev"]),
             patch.object(runtime, "_resolve_local_wallet_address", return_value=FROM_ADDRESS),
             patch.object(runtime, "_cast_balance", return_value=balance),
             patch.object(runtime, "_run_cast", return_value=TX_HASH) as run_cast,
@@ -86,8 +88,43 @@ class RadiusWalletRuntimeTests(unittest.TestCase):
         send_args = run_cast.call_args.args[0]
         self.assertNotIn("--gas-limit", send_args)
         self.assertNotIn("--gas-price", send_args)
+        self.assertNotIn("--private-key", send_args)
+        self.assertIn("--account", send_args)
         self.assertEqual(result["tx_hash"], TX_HASH)
         rpc_request.assert_not_called()
+
+    def test_send_sbc_mainnet_network_override_uses_mainnet_config(self):
+        runtime = RadiusWalletRuntime()
+        balance = {
+            "address": FROM_ADDRESS,
+            "rusd": "0",
+            "rusd_raw": "0",
+            "sbc": "1",
+            "sbc_raw": "1000000",
+        }
+        with (
+            patch.object(RadiusWalletRuntime, "_signer_args", return_value=["--account", "radius-dev"]),
+            patch.object(RadiusWalletRuntime, "_resolve_local_wallet_address", return_value=FROM_ADDRESS),
+            patch.object(RadiusWalletRuntime, "_cast_balance", return_value=balance),
+            patch.object(RadiusWalletRuntime, "_run_cast", return_value=TX_HASH) as run_cast,
+            patch.object(RadiusWalletRuntime, "_wait_for_receipt", return_value=None),
+        ):
+            result = runtime.send_sbc(TO_ADDRESS, "1", network="mainnet")
+
+        send_args = run_cast.call_args.args[0]
+        self.assertIn("https://rpc.radiustech.xyz", send_args)
+        self.assertIn("723487", send_args)
+        self.assertEqual(result["network"], "mainnet")
+        self.assertEqual(result["explorer_url"], f"https://network.radiustech.xyz/tx/{TX_HASH}")
+
+    def test_tx_status_pending_on_null_receipt(self):
+        runtime = RadiusWalletRuntime()
+        with patch.object(runtime, "_rpc_request", return_value=None):
+            result = runtime.tx_status(TX_HASH)
+        self.assertEqual(result["tx_hash"], TX_HASH)
+        self.assertEqual(result["status_label"], "pending")
+        self.assertEqual(result["network"], "testnet")
+        self.assertEqual(result["explorer_url"], f"https://testnet.radiustech.xyz/tx/{TX_HASH}")
 
     def test_fee_balance_rejects_exact_sbc_para_transfer_without_fee_source(self):
         runtime = RadiusWalletRuntime()

@@ -6,19 +6,33 @@
   "properties": {
     "tools": {
       "type": "array",
-      "items": { "$ref": "#/$defs/tool" }
+      "items": {
+        "$ref": "#/$defs/tool"
+      }
     }
   },
-  "required": ["tools"],
+  "required": [
+    "tools"
+  ],
   "$defs": {
     "tool": {
       "type": "object",
       "properties": {
-        "name": { "type": "string" },
-        "description": { "type": "string" },
-        "inputSchema": { "type": "object" }
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "inputSchema": {
+          "type": "object"
+        }
       },
-      "required": ["name", "description", "inputSchema"]
+      "required": [
+        "name",
+        "description",
+        "inputSchema"
+      ]
     }
   },
   "tools": [
@@ -28,7 +42,13 @@
       "inputSchema": {
         "type": "object",
         "properties": {
-          "provider": { "type": "string", "enum": ["local", "para"] }
+          "provider": {
+            "type": "string",
+            "enum": [
+              "local",
+              "para"
+            ]
+          }
         },
         "required": []
       }
@@ -39,36 +59,86 @@
       "inputSchema": {
         "type": "object",
         "properties": {
-          "provider": { "type": "string", "enum": ["local", "para"] },
-          "address": { "type": "string" }
+          "provider": {
+            "type": "string",
+            "enum": [
+              "local",
+              "para"
+            ]
+          },
+          "address": {
+            "type": "string"
+          }
         },
         "required": []
       }
     },
     {
       "name": "radius_send_sbc",
-      "description": "Send SBC using the selected provider wallet.",
+      "description": "Send SBC using the selected provider wallet. Accepts an optional network override for explicit mainnet/testnet routing.",
       "inputSchema": {
         "type": "object",
         "properties": {
-          "provider": { "type": "string", "enum": ["local", "para"] },
-          "to": { "type": "string" },
-          "amount_sbc": { "type": "string" }
+          "provider": {
+            "type": "string",
+            "enum": [
+              "local",
+              "para"
+            ]
+          },
+          "to": {
+            "type": "string"
+          },
+          "amount_sbc": {
+            "type": "string"
+          },
+          "network": {
+            "type": "string",
+            "enum": [
+              "testnet",
+              "mainnet"
+            ],
+            "description": "Optional per-call network override for writes. Defaults to runtime env/testnet."
+          }
         },
-        "required": ["to", "amount_sbc"]
+        "required": [
+          "to",
+          "amount_sbc"
+        ]
       }
     },
     {
       "name": "radius_send_rusd",
-      "description": "Send native RUSD using the selected provider wallet.",
+      "description": "Send native RUSD using the selected provider wallet. Accepts an optional network override for explicit mainnet/testnet routing.",
       "inputSchema": {
         "type": "object",
         "properties": {
-          "provider": { "type": "string", "enum": ["local", "para"] },
-          "to": { "type": "string" },
-          "amount_rusd": { "type": "string" }
+          "provider": {
+            "type": "string",
+            "enum": [
+              "local",
+              "para"
+            ]
+          },
+          "to": {
+            "type": "string"
+          },
+          "amount_rusd": {
+            "type": "string"
+          },
+          "network": {
+            "type": "string",
+            "enum": [
+              "testnet",
+              "mainnet"
+            ],
+            "description": "Optional per-call network override for writes. Defaults to runtime env/testnet."
+          }
         },
-        "required": ["to", "amount_rusd"]
+        "required": [
+          "to",
+          "amount_rusd"
+        ]
       }
     },
     {
@@ -77,9 +147,13 @@
       "inputSchema": {
         "type": "object",
         "properties": {
-          "tx_hash": { "type": "string" }
+          "tx_hash": {
+            "type": "string"
+          }
         },
-        "required": ["tx_hash"]
+        "required": [
+          "tx_hash"
+        ]
       }
     },
     {

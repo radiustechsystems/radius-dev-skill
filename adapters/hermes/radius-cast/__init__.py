@@ -170,10 +170,12 @@ def register(ctx):
             return "Error: missing required parameter 'to'."
         if not amount_sbc:
             return "Error: missing required parameter 'amount_sbc'."
+        network = str((params or {}).get("network") or "").strip() or None
         data = _RUNTIME.send_sbc(
             to_address=to_address,
             amount_sbc=amount_sbc,
             provider=provider,
+            network=network,
         )
         data["session_id"] = session_id or None
         return json.dumps(data)
@@ -186,10 +188,12 @@ def register(ctx):
             return "Error: missing required parameter 'to'."
         if not amount_rusd:
             return "Error: missing required parameter 'amount_rusd'."
+        network = str((params or {}).get("network") or "").strip() or None
         data = _RUNTIME.send_rusd(
             to_address=to_address,
             amount_rusd=amount_rusd,
             provider=provider,
+            network=network,
         )
         data["session_id"] = session_id or None
         return json.dumps(data)
@@ -293,6 +297,11 @@ def register(ctx):
                             "Optional wallet provider override. If omitted, the session wallet provider is used."
                         ),
                     },
+                    "network": {
+                        "type": "string",
+                        "enum": ["testnet", "mainnet"],
+                        "description": "Optional network override for this write. Defaults to runtime env/testnet.",
+                    },
                 },
                 "required": ["to", "amount_sbc"],
             },
@@ -326,6 +335,11 @@ def register(ctx):
                         "description": (
                             "Optional wallet provider override. If omitted, the session wallet provider is used."
                         ),
+                    },
+                    "network": {
+                        "type": "string",
+                        "enum": ["testnet", "mainnet"],
+                        "description": "Optional network override for this write. Defaults to runtime env/testnet.",
                     },
                 },
                 "required": ["to", "amount_rusd"],

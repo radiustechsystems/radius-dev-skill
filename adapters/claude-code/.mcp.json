@@ -4,8 +4,16 @@
       "radius": {
         "command": "python3",
         "args": [
-          "../../runtimes/python/radius_wallet_mcp.py"
-        ]
+          "${CLAUDE_PLUGIN_ROOT}/runtimes/python/radius_wallet_mcp.py"
+        ],
+        "env": {
+          "RADIUS_STATE_DIR": "${RADIUS_STATE_DIR}",
+          "HERMES_HOME": "${HERMES_HOME}",
+          "RADIUS_RPC_URL": "${RADIUS_RPC_URL}",
+          "RADIUS_CHAIN_ID": "${RADIUS_CHAIN_ID}",
+          "RADIUS_EXPLORER_URL": "${RADIUS_EXPLORER_URL}",
+          "RADIUS_SBC_ADDRESS": "${RADIUS_SBC_ADDRESS}"
+        }
       }
     }
   }

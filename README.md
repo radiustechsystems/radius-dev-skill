@@ -11,13 +11,14 @@ The current marketplace bundle id stays `radius-dev` for backward compatibility,
 
 ## Repo Layout
 
-- `skills/*` — source of truth for portable Radius skills
+- `skills/*` — source of truth for portable Radius skills (`radius-dev`, `x402`, `dripping-faucet`, `radius-agent-ops`)
 - `spec/tools.schema.json` — deterministic Radius wallet tool schema
 - `spec/networks.json` — canonical Radius network constants used by runtimes and adapters
 - `spec/golden-tests/*` — skill behavior fixtures and regression prompts
 - `runtimes/python/*` — shared deterministic Radius wallet runtime, CLI, and MCP server
 - `runtimes/typescript/*` — TypeScript runtime target surface
 - `adapters/claude-code/.claude-plugin/plugin.json` — Claude bundle manifest used by the current marketplace package
+- `adapters/claude-code/skills/*` and `adapters/claude-code/runtimes/python/*` — materialized Claude plugin payload for marketplace installs
 - `adapters/claude-code/.mcp.json` — bundle-scoped MCP config
 - `adapters/*` — thin framework adapters over the shared spec and runtimes
 - `.claude-plugin/marketplace.json` — marketplace root metadata
