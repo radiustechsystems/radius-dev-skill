@@ -37,18 +37,18 @@ Client                          Server                         Facilitator
   │                               │                               │
   │─── GET /api/data ────────────>│                               │
   │                               │                               │
-  │<── 402 + payment requirements─│                               │
+  │<── 402 + PAYMENT-REQUIRED ────│                               │
   │                               │                               │
   │  (sign EIP-2612 permit +      │                               │
   │   Permit2 authorization)      │                               │
   │                               │                               │
   │─── GET /api/data              │                               │
-  │    X-Payment: <base64> ──────>│                               │
+  │    PAYMENT-SIGNATURE ────────>│                               │
   │                               │── POST /verify ──────────────>│
   │                               │<── { isValid: true } ─────────│
   │                               │── POST /settle ──────────────>│
   │                               │<── { success, txHash } ───────│
-  │<── 200 + data ────────────────│                               │
+  │<── 200 + data + PAYMENT-RESPONSE ─│
 ```
 
 The client signs two permits (never sends a transaction):
@@ -56,6 +56,11 @@ The client signs two permits (never sends a transaction):
 2. **Permit2 PermitWitnessTransferFrom** — authorizes the token transfer via the x402 Proxy
 
 The facilitator executes both on-chain in a single settlement transaction.
+
+HTTP x402 v2 carries protocol data in headers:
+- `PAYMENT-REQUIRED` — server to client, base64-encoded payment requirements
+- `PAYMENT-SIGNATURE` — client to server, base64-encoded signed payment payload
+- `PAYMENT-RESPONSE` — server to client, base64-encoded settlement result
 
 ## Configuration
 
@@ -68,20 +73,28 @@ All x402 integration on Radius uses these constants:
 | **SBC decimals** | 6 | 6 |
 | **Permit2 contract** | `0x000000000022D473030F116dDEE9F6B43aC78BA3` | same |
 | **x402 Permit2 Proxy** | `0x402085c248EeA27D92E8b30b2C58ed07f9E20001` | same |
-| **Facilitator URL** | `https://facilitator.andrs.dev` | `https://facilitator.x402.rs` |
+| **Facilitator URL** | `https://facilitator.radiustech.xyz` | `https://facilitator.testnet.radiustech.xyz` |
 | **EIP-2612 domain name** | `Stable Coin` | `Stable Coin` |
 | **EIP-2612 domain version** | `1` | `1` |
 
-> **Facilitator note:** `facilitator.andrs.dev` currently supports mainnet only. Check
-> `facilitator.andrs.dev/supported` for current network support — testnet may be added
-> (contracts are deployed, it's a config change). Use `facilitator.x402.rs` (FareSide)
-> for testnet development in the meantime.
+> **Facilitator note:** Radius-operated facilitators are the recommended defaults for both
+> mainnet and testnet. Check `/supported` before integrating to confirm the target network,
+> transfer method (`permit2`), and extensions such as `eip2612GasSponsoring`.
 >
-> **Testnet caveat:** The FareSide facilitator does **not** process the EIP-2612 gas sponsoring
-> extension during settlement. Fresh wallets must pre-approve the Permit2 contract before their
-> first x402 payment on testnet. See [x402-client.md](references/x402-client.md) for a Permit2
-> approval helper. This is a FareSide limitation — `facilitator.andrs.dev` on mainnet handles
-> first-time wallets correctly via gas sponsoring.
+> **Third-party caveat:** Some non-Radius facilitators may differ in supported networks,
+> response shape, or EIP-2612 gas sponsoring behavior. Verify their `/supported`, `/health`,
+> `/verify`, and `/settle` behavior before using them in production.
+
+### Alternative facilitators
+
+Use Radius-operated facilitators by default. These third-party facilitators may be useful for
+fallbacks, testing, or routing, but their supported methods and response shapes can differ:
+
+| Facilitator | URL | Networks | Notes |
+|-------------|-----|----------|-------|
+| Stablecoin.xyz | `https://x402.stablecoin.xyz` | Mainnet + testnet | Hosted facilitator tooling |
+| FareSide | `https://facilitator.x402.rs` | Testnet only | May require Permit2 pre-approval for fresh wallets |
+| Middlebit | `https://middlebit.com` | Mainnet | Multi-facilitator routing and analytics |
 
 For chain definitions, RPC URLs, and explorer URLs, see the **radius-dev** skill.
 
@@ -93,7 +106,7 @@ const x402Config = {
   asset: '0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb',
   network: 'eip155:723487',
   payTo: process.env.PAYMENT_ADDRESS!,          // your wallet
-  facilitatorUrl: 'https://facilitator.andrs.dev',
+  facilitatorUrl: 'https://facilitator.radiustech.xyz',
   facilitatorApiKey: process.env.FACILITATOR_API_KEY, // optional
   amount: '100',                                // 0.0001 SBC per request
 };
@@ -105,7 +118,7 @@ const x402Config = {
   asset: '0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb',
   network: 'eip155:72344',
   payTo: process.env.PAYMENT_ADDRESS!,
-  facilitatorUrl: 'https://facilitator.x402.rs',
+  facilitatorUrl: 'https://facilitator.testnet.radiustech.xyz',
   amount: '100',
 };
 ```
@@ -136,12 +149,12 @@ Before writing integration code, verify the infrastructure is in place:
 
 ```bash
 # Mainnet
-curl -s https://facilitator.andrs.dev/health | jq .status
-curl -s https://facilitator.andrs.dev/supported | jq '.kinds[] | .network'
+curl -s https://facilitator.radiustech.xyz/health | jq .status
+curl -s https://facilitator.radiustech.xyz/supported | jq '.kinds[] | .network'
 
 # Testnet
-curl -s https://facilitator.x402.rs/health
-curl -s https://facilitator.x402.rs/supported
+curl -s https://facilitator.testnet.radiustech.xyz/health | jq .status
+curl -s https://facilitator.testnet.radiustech.xyz/supported | jq '.kinds[] | .network'
 ```
 
 The `/supported` response confirms the facilitator handles your network, transfer method (`permit2`), and EIP-2612 domain values. See [facilitator-api.md](references/facilitator-api.md) for full response format.
@@ -160,9 +173,9 @@ const balance = await publicClient.readContract({
 
 No SBC? Use the **dripping-faucet** skill to get tokens.
 
-**3. (Testnet only) Pre-approve Permit2 for FareSide**
+**3. Third-party facilitators: check Permit2 approval requirements**
 
-Fresh wallets must pre-approve the Permit2 contract before their first payment on testnet. See the [pre-approval helper](references/x402-client.md#testnet-pre-approving-permit2-for-fareside).
+Radius-operated facilitators support EIP-2612 gas sponsoring for first-time wallets. Some third-party facilitators may require fresh wallets to pre-approve the Permit2 contract before their first payment. See the [pre-approval helper](references/x402-client.md#third-party-facilitators-pre-approving-permit2).
 
 ## Operating procedure
 
@@ -178,11 +191,11 @@ Fresh wallets must pre-approve the Permit2 contract before their first payment o
 
 ### B. "I want to consume a paid x402 API" (client-side)
 
-1. **Discover services** — query `/discovery/resources` endpoints to find available x402 services programmatically. See [x402-client.md § Discovering services](references/x402-client.md#discovering-x402-services) for code and known endpoints. Any HTTP endpoint that returns 402 with a `paymentRequirements` array is also an x402 service — the 402 response itself is a discovery mechanism.
-2. **Request the endpoint** — receive 402 with payment requirements in response body
-3. **Parse the requirements** — extract `paymentRequirements[0]` from the 402 response
+1. **Discover services** — query `/discovery/resources` endpoints to find available x402 services programmatically. See [x402-client.md § Discovering services](references/x402-client.md#discovering-x402-services) for code and known endpoints. Any HTTP endpoint that returns 402 with a `PAYMENT-REQUIRED` header is also an x402 service — the 402 response itself is a discovery mechanism.
+2. **Request the endpoint** — receive 402 with payment requirements in the `PAYMENT-REQUIRED` header
+3. **Parse the requirements** — base64-decode `PAYMENT-REQUIRED` and select `accepts[0]`
 4. **Sign both permits** — use `signX402Payment()` from [x402-client.md](references/x402-client.md)
-5. **Retry with payment** — set the `X-Payment` header to the base64-encoded payload
+5. **Retry with payment** — set the `PAYMENT-SIGNATURE` header to the base64-encoded payload
 6. **Receive data** — 200 response with the paid content
 
 ### Environment variables
@@ -202,8 +215,8 @@ Fresh wallets must pre-approve the Permit2 contract before their first payment o
 | EIP-2612 domain name | `"SBC"` or `"Stablecoin"` | `"Stable Coin"` (exact, with space). Matters for first payment from a wallet (establishes Permit2 allowance on-chain). |
 | EIP-2612 spender | Using payTo address or x402 Proxy | Spender = **Permit2 contract** (`0x0000...8BA3`). Matters for first payment. |
 | Only signing one permit | Sign just EIP-2612 or just Permit2 | Must sign **both** — EIP-2612 + Permit2. The EIP-2612 establishes Permit2 allowance; Permit2 authorizes the transfer. |
-| Mainnet-only facilitator | Testing against `facilitator.andrs.dev` on testnet | Use `facilitator.x402.rs` for testnet |
-| FareSide first-time wallet | Expecting gas sponsoring to work on testnet | FareSide does NOT process EIP-2612 gas sponsoring — pre-approve Permit2 via `permit()` on SBC contract before first payment |
+| Wrong network facilitator | Using the mainnet facilitator for testnet or the testnet facilitator for mainnet | Use `https://facilitator.radiustech.xyz` for `eip155:723487` and `https://facilitator.testnet.radiustech.xyz` for `eip155:72344` |
+| Third-party first-time wallet | Assuming every facilitator sponsors first-time EIP-2612 Permit2 allowance setup | Check `/supported`; if gas sponsoring is unavailable, pre-approve Permit2 via `permit()` on SBC before first payment |
 | Address casing | Comparing addresses with `===` | Always compare case-insensitively or normalize with viem's `getAddress()` |
 | Missing EIP-2612 nonce | Hardcoding nonce to 0 | Read from token: `nonces(address)` on SBC contract |
 | Permit2 nonce | Sequential nonce | Random nonce (crypto random bytes) |

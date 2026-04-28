@@ -43,7 +43,7 @@ const permitTypes = {
 // Message values:
 // owner     = your wallet address
 // spender   = Permit2 contract: 0x000000000022D473030F116dDEE9F6B43aC78BA3
-// value     = payment amount in raw 6-decimal units (e.g. 100n for 0.0001 SBC)
+// value     = Permit2 approval amount (commonly max uint256; must cover the payment)
 // nonce     = read from SBC contract: nonces(ownerAddress) — sequential, starts at 0
 // deadline  = Unix timestamp (e.g. now + 300 seconds)
 ```
@@ -107,6 +107,19 @@ function randomPermit2Nonce(): bigint {
   return BigInt('0x' + Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join(''));
 }
 
+function encodeBase64Json(data: unknown): string {
+  const json = JSON.stringify(data);
+  if (typeof btoa === 'function') return btoa(json);
+  return Buffer.from(json, 'utf8').toString('base64');
+}
+
+function decodeBase64Json<T = any>(encoded: string): T {
+  const json = typeof atob === 'function'
+    ? atob(encoded)
+    : Buffer.from(encoded, 'base64').toString('utf8');
+  return JSON.parse(json);
+}
+
 interface SignX402Params {
   /** EIP-712 signTypedData function (from viem account or browser wallet) */
   signTypedData: (params: any) => Promise<Hex>;
@@ -116,7 +129,7 @@ interface SignX402Params {
   permitNonce: bigint;
   /** The resource being paid for */
   resource: { url: string; description?: string; mimeType?: string };
-  /** Payment requirements from the server's 402 response */
+  /** Payment requirement selected from the decoded PAYMENT-REQUIRED header's accepts array */
   accepted: {
     scheme: string;
     network: string;
@@ -137,10 +150,11 @@ export async function signX402Payment({
   resource,
   accepted,
   config,
-}: SignX402Params): Promise<{ payload: any; xPayment: string }> {
+}: SignX402Params): Promise<{ payload: any; paymentSignature: string }> {
   const cfg = { ...RADIUS_DEFAULTS, ...config };
   const deadline = BigInt(Math.floor(Date.now() / 1000) + 300);
   const amount = accepted.amount;
+  const approvalAmount = (2n ** 256n - 1n).toString();
 
   // 1. Sign EIP-2612 permit (approve Permit2 contract to spend SBC)
   const eip2612Signature = await signTypedData({
@@ -163,7 +177,7 @@ export async function signX402Payment({
     message: {
       owner,
       spender: cfg.permit2Address,
-      value: BigInt(amount),
+      value: BigInt(approvalAmount),
       nonce: permitNonce,
       deadline,
     },
@@ -229,15 +243,20 @@ export async function signX402Payment({
     extensions: {
       eip2612GasSponsoring: {
         info: {
-          amount: amount.toString(),
+          from: owner,
+          asset: cfg.tokenAddress,
+          spender: cfg.permit2Address,
+          amount: approvalAmount,
+          nonce: permitNonce.toString(),
           deadline: deadline.toString(),
           signature: eip2612Signature,
+          version: '1',
         },
       },
     },
   };
 
-  return { payload, xPayment: btoa(JSON.stringify(payload)) };
+  return { payload, paymentSignature: encodeBase64Json(payload) };
 }
 ```
 
@@ -310,8 +329,9 @@ async function callPaidApi(apiUrl: string) {
     return;
   }
 
-  const requirements = await initialRes.json();
-  const accepted = requirements.paymentRequirements[0];
+  const paymentRequired = await parsePaymentRequired(initialRes);
+  if (!paymentRequired) throw new Error('Expected PAYMENT-REQUIRED response');
+  const accepted = paymentRequired.accepts[0];
 
   // 2. Read EIP-2612 nonce
   const permitNonce = await publicClient.readContract({
@@ -322,7 +342,7 @@ async function callPaidApi(apiUrl: string) {
   });
 
   // 3. Sign payment
-  const { xPayment } = await signX402Payment({
+  const { paymentSignature } = await signX402Payment({
     signTypedData: (params) => account.signTypedData(params),
     owner: account.address,
     permitNonce,
@@ -332,7 +352,7 @@ async function callPaidApi(apiUrl: string) {
 
   // 4. Retry with payment
   const paidRes = await fetch(apiUrl, {
-    headers: { 'X-Payment': xPayment },
+    headers: { 'PAYMENT-SIGNATURE': paymentSignature },
   });
 
   console.log('Status:', paidRes.status);
@@ -364,8 +384,9 @@ export function usePaidFetch() {
     // 1. Get 402 requirements
     const initialRes = await fetch(apiUrl);
     if (initialRes.status !== 402) return initialRes.json();
-    const requirements = await initialRes.json();
-    const accepted = requirements.paymentRequirements[0];
+    const paymentRequired = await parsePaymentRequired(initialRes);
+    if (!paymentRequired) throw new Error('Expected PAYMENT-REQUIRED response');
+    const accepted = paymentRequired.accepts[0];
 
     // 2. Read EIP-2612 nonce
     const publicClient = createPublicClient({
@@ -380,7 +401,7 @@ export function usePaidFetch() {
     });
 
     // 3. Sign payment (browser wallet popup for each signature)
-    const { xPayment } = await signX402Payment({
+    const { paymentSignature } = await signX402Payment({
       signTypedData: (params: any) => walletClient.signTypedData(params),
       owner: address,
       permitNonce,
@@ -390,7 +411,7 @@ export function usePaidFetch() {
 
     // 4. Retry with payment
     const paidRes = await fetch(apiUrl, {
-      headers: { 'X-Payment': xPayment },
+      headers: { 'PAYMENT-SIGNATURE': paymentSignature },
     });
     return paidRes.json();
   }
@@ -406,28 +427,31 @@ export function usePaidFetch() {
 ### Parsing 402 responses
 
 ```typescript
-async function parsePaymentRequirements(response: Response) {
+async function parsePaymentRequired(response: Response) {
   if (response.status !== 402) return null;
 
-  const body = await response.json();
+  const header = response.headers.get('PAYMENT-REQUIRED');
+  if (!header) throw new Error('Missing PAYMENT-REQUIRED header');
+
+  const body = decodeBase64Json(header);
 
   // Validate x402 v2 format
-  if (body.x402Version !== 2 || !body.paymentRequirements?.length) {
+  if (body.x402Version !== 2 || !body.accepts?.length) {
     throw new Error('Unexpected 402 response format');
   }
 
-  return body.paymentRequirements[0];
+  return body;
 }
 ```
 
 ### Handling payment failures
 
-After sending the `X-Payment` header, the server may still return non-200:
+After sending the `PAYMENT-SIGNATURE` header, the server may still return non-200:
 
 | Status | Meaning | Action |
 |--------|---------|--------|
 | 200 | Payment accepted | Parse response body as normal |
-| 400 | Malformed X-Payment header | Check base64 encoding, JSON structure |
+| 400 | Malformed PAYMENT-SIGNATURE header | Check base64 encoding, JSON structure |
 | 402 | Payment verification failed | Requirements may have changed — re-fetch 402 and re-sign |
 | 502 | Facilitator unavailable | Retry after a short delay |
 
@@ -438,10 +462,12 @@ async function fetchWithRetry(apiUrl: string, maxRetries = 2) {
     const res = await fetch(apiUrl);
     if (res.status !== 402) return res;
 
-    const accepted = (await res.json()).paymentRequirements[0];
+    const paymentRequired = await parsePaymentRequired(res);
+    if (!paymentRequired) throw new Error('Expected PAYMENT-REQUIRED response');
+    const accepted = paymentRequired.accepts[0];
     const permitNonce = await getPermitNonce(account.address);
 
-    const { xPayment } = await signX402Payment({
+    const { paymentSignature } = await signX402Payment({
       signTypedData: (params) => account.signTypedData(params),
       owner: account.address,
       permitNonce,
@@ -449,7 +475,7 @@ async function fetchWithRetry(apiUrl: string, maxRetries = 2) {
       accepted,
     });
 
-    const paidRes = await fetch(apiUrl, { headers: { 'X-Payment': xPayment } });
+    const paidRes = await fetch(apiUrl, { headers: { 'PAYMENT-SIGNATURE': paymentSignature } });
     if (paidRes.ok) return paidRes;
 
     // If still 402, requirements may have changed — loop and re-sign
@@ -461,9 +487,9 @@ async function fetchWithRetry(apiUrl: string, maxRetries = 2) {
 
 ---
 
-## Testnet: pre-approving Permit2 for FareSide
+## Third-party facilitators: pre-approving Permit2
 
-The FareSide facilitator (`facilitator.x402.rs`) does **not** process EIP-2612 gas sponsoring during settlement. Fresh wallets must pre-approve the Permit2 contract before their first x402 payment on testnet.
+Radius-operated facilitators support EIP-2612 gas sponsoring for first-time wallets. Some third-party facilitators do **not** process EIP-2612 gas sponsoring during settlement. Fresh wallets may need to pre-approve the Permit2 contract before their first x402 payment when using those facilitators.
 
 Use EIP-2612 `permit()` on the SBC contract to grant Permit2 an allowance:
 
@@ -547,8 +573,8 @@ async function approvePermit2ForTestnet() {
 approvePermit2ForTestnet();
 ```
 
-> **This is only needed for testnet with FareSide.** On mainnet, `facilitator.andrs.dev` handles
-> gas sponsoring automatically — no pre-approval required.
+> **This is only needed when the facilitator does not process EIP-2612 gas sponsoring.**
+> Radius-operated facilitators handle gas sponsoring automatically — no pre-approval required.
 
 ---
 
