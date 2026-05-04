@@ -78,12 +78,12 @@ Use this Skill when the user asks for:
 Use the wallet shape that matches the workflow:
 
 - **Existing CLI / Foundry / cast wallets:** use named Foundry keystore accounts. Create them with `cast wallet import <name> --interactive`, then sign or send with `--account <name>`. Expose `CAST_ACCOUNT=<name>` and derive addresses with `cast wallet address --account "$CAST_ACCOUNT"` when possible.
-- **Agent-created testnet wallets:** use the local bootstrap helper, then consume the generated env file from viem/app-code flows:
+- **Agent-created wallets:** use the local bootstrap helper, then consume the generated env file from viem/app-code flows:
   ```bash
   node plugins/radius/skills/radius-dev/scripts/radius-wallet-bootstrap.mjs --name radius-demo --network testnet
   set -a; . .radius/wallets/radius-demo.env; set +a
   ```
-  The helper writes `.radius/wallets/<name>.env` with `0600` permissions, creates `.radius/.gitignore`, prints only non-secret values, and refuses non-testnet wallet creation.
+  Pass `--network mainnet` for a mainnet wallet (the helper writes the matching chain ID and RPC into the env file). The helper writes `.radius/wallets/<name>.env` with `0600` permissions, creates `.radius/.gitignore`, and prints only non-secret values.
 - **App code / viem examples:** private keys may come from environment variables such as `PRIVATE_KEY` or `RADIUS_PRIVATE_KEY`, loaded from `.env`, `.radius/wallets/<name>.env`, or a secrets manager. Never inline or log them.
 - **Never pass raw keys as CLI arguments.** Do not use `--private-key` in commands; it can leak through shell history and process listings.
 
@@ -239,5 +239,5 @@ When you implement changes, provide:
 - Micropayment patterns: [micropayments.md](references/micropayments.md)
 - Production gotchas: [gotchas.md](references/gotchas.md)
 - Security checklist: [security.md](references/security.md)
-- Agent testnet wallet helper: [scripts/radius-wallet-bootstrap.mjs](scripts/radius-wallet-bootstrap.mjs)
+- Agent wallet bootstrap helper: [scripts/radius-wallet-bootstrap.mjs](scripts/radius-wallet-bootstrap.mjs)
 - Curated reference links: [resources.md](references/resources.md)
