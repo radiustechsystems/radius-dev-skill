@@ -1,0 +1,58 @@
+{
+  "types": {
+    "EIP712Domain": [
+      {
+        "name": "name",
+        "type": "string"
+      },
+      {
+        "name": "version",
+        "type": "string"
+      },
+      {
+        "name": "chainId",
+        "type": "uint256"
+      },
+      {
+        "name": "verifyingContract",
+        "type": "address"
+      }
+    ],
+    "Permit": [
+      {
+        "name": "owner",
+        "type": "address"
+      },
+      {
+        "name": "spender",
+        "type": "address"
+      },
+      {
+        "name": "value",
+        "type": "uint256"
+      },
+      {
+        "name": "nonce",
+        "type": "uint256"
+      },
+      {
+        "name": "deadline",
+        "type": "uint256"
+      }
+    ]
+  },
+  "primaryType": "Permit",
+  "domain": {
+    "name": "Stable Coin",
+    "version": "1",
+    "chainId": 72344,
+    "verifyingContract": "0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb"
+  },
+  "message": {
+    "owner": "<OWNER_ADDRESS>",
+    "spender": "0x000000000022D473030F116dDEE9F6B43aC78BA3",
+    "value": "<PAYMENT_AMOUNT_RAW_UNITS>",
+    "nonce": "<EIP2612_NONCE_FROM_TOKEN>",
+    "deadline": "<UNIX_DEADLINE>"
+  }
+}

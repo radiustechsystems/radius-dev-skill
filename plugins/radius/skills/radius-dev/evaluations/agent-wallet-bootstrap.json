@@ -1,0 +1,23 @@
+{
+    "name": "Agent Testnet Wallet Bootstrap",
+    "skills": ["radius-dev"],
+    "query": "Create a fresh Radius testnet wallet for an automated agent demo. I need to use it from viem app code.",
+    "context": "The user needs a fresh testnet wallet that an agent can create without interactive prompts. The wallet will be used for faucet funding and x402 payment from app-code flows. Mainnet is not in scope.",
+    "expected_behavior": [
+        "Uses radius-wallet-bootstrap.mjs with --network testnet and a file-safe wallet name",
+        "Creates or reuses .radius/wallets/<name>.env in the current project",
+        "Ensures .radius/.gitignore prevents generated wallet files from being committed",
+        "Loads PRIVATE_KEY or RADIUS_PRIVATE_KEY from the generated env file for viem app-code signing",
+        "Prints or reports only non-secret values such as OWNER, PAYMENT_ADDRESS, network, chain ID, RPC URL, and env file path",
+        "Refuses to create an agent-managed mainnet wallet",
+        "Does not use Foundry keystore prompts for this fresh agent-created testnet wallet"
+    ],
+    "success_criteria": [
+        "The helper command includes radius-wallet-bootstrap.mjs --network testnet",
+        "The generated env file includes PRIVATE_KEY, RADIUS_PRIVATE_KEY, OWNER, PAYMENT_ADDRESS, RADIUS_NETWORK, RADIUS_CHAIN_ID, and RADIUS_RPC_URL",
+        "The private key is never printed, logged, pasted into chat, hardcoded, or passed as a CLI argument",
+        "No command uses --private-key",
+        "No command relies on cast wallet import --interactive for the fresh agent-created wallet",
+        "The answer directs subsequent faucet and x402 client flows to use env-backed viem signing"
+    ]
+}

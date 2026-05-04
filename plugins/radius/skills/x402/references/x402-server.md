@@ -126,16 +126,22 @@ export function buildEip2612GasSponsoringExtension() {
       $schema: 'https://json-schema.org/draft/2020-12/schema',
       type: 'object',
       properties: {
-        from: { type: 'string', pattern: '^0x[a-fA-F0-9]{40}$' },
-        asset: { type: 'string', pattern: '^0x[a-fA-F0-9]{40}$' },
-        spender: { type: 'string', pattern: '^0x[a-fA-F0-9]{40}$' },
-        amount: { type: 'string', pattern: '^[0-9]+$' },
-        nonce: { type: 'string', pattern: '^[0-9]+$' },
-        deadline: { type: 'string', pattern: '^[0-9]+$' },
-        signature: { type: 'string', pattern: '^0x[a-fA-F0-9]+$' },
-        version: { type: 'string', pattern: '^[0-9]+(\\.[0-9]+)*$' },
+        info: {
+          type: 'object',
+          properties: {
+            from: { type: 'string', pattern: '^0x[a-fA-F0-9]{40}$' },
+            asset: { type: 'string', pattern: '^0x[a-fA-F0-9]{40}$' },
+            spender: { type: 'string', pattern: '^0x[a-fA-F0-9]{40}$' },
+            amount: { type: 'string', pattern: '^[0-9]+$' },
+            nonce: { type: 'string', pattern: '^[0-9]+$' },
+            deadline: { type: 'string', pattern: '^[0-9]+$' },
+            signature: { type: 'string', pattern: '^0x[a-fA-F0-9]+$' },
+            version: { type: 'string', pattern: '^[0-9]+(\\.[0-9]+)*$' },
+          },
+          required: ['from', 'asset', 'spender', 'amount', 'nonce', 'deadline', 'signature', 'version'],
+        },
       },
-      required: ['from', 'asset', 'spender', 'amount', 'nonce', 'deadline', 'signature', 'version'],
+      required: ['info'],
     },
   };
 }
@@ -371,6 +377,32 @@ async function handlePaidRequest(request: Request, config: X402Config): Promise<
   }
 }
 ```
+
+---
+
+## Agent checklist: gate an existing endpoint
+
+When adding x402 to an existing HTTP route, implement the payment behavior first and leave platform deployment to the user's Cloudflare, Wrangler, Railway, or hosting-specific skill.
+
+Required endpoint behavior:
+- Create an `X402Config` with the correct Radius network, SBC asset, `payTo`, facilitator URL, and 6-decimal raw amount.
+- Call `processPayment(config, request)` before returning protected content.
+- On `no-payment`, return HTTP 402 with `PAYMENT-REQUIRED: <base64-json>`.
+- On `invalid-header`, return HTTP 400.
+- On `verify-failed`, return HTTP 402 and a fresh `PAYMENT-REQUIRED` header.
+- On `verify-unreachable` or `settle-unreachable`, return HTTP 502.
+- On `settle-failed`, return HTTP 402 with `PAYMENT-RESPONSE: <base64-json>` containing facilitator failure details.
+- On `settled`, return protected content with `PAYMENT-RESPONSE: <base64-json>` containing settlement metadata.
+- Expose `PAYMENT-REQUIRED` and `PAYMENT-RESPONSE` in CORS headers for browser clients.
+- Do not choose deployment infrastructure from this skill. After local or existing-host endpoint behavior is correct, hand off deployment to the platform-specific skill. If the user explicitly asked to deploy, do not stop at "deployment is out of scope"; validate payment behavior first, then invoke or route to Cloudflare, Wrangler, Railway, or the appropriate deployment skill.
+
+Validation before deployment:
+
+```bash
+curl -i "$PROTECTED_URL"
+```
+
+The unpaid response should be HTTP 402 with a `PAYMENT-REQUIRED` header whose decoded JSON includes `x402Version: 2`, an `accepts` array, `extra.assetTransferMethod: "permit2"`, and `extensions.eip2612GasSponsoring`.
 
 ---
 
