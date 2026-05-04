@@ -1,0 +1,28 @@
+{
+    "name": "x402 Existing Endpoint Gating Without Deployment",
+    "skills": ["x402"],
+    "query": "Add x402 payment gating to this existing HTTP route on Radius testnet. Charge 0.001 SBC per request. Do not choose or configure deployment infrastructure.",
+    "context": "The user has an existing HTTP API route and wants x402 payment behavior added. Deployment is explicitly out of scope for this skill and should be handled later by the relevant platform skill.",
+    "expected_behavior": [
+        "Uses the x402 server reference and does not choose Cloudflare, Railway, or another hosting platform",
+        "Creates an X402Config with network eip155:72344, Radius testnet facilitator URL, SBC asset, payTo, and amount '1000'",
+        "Calls processPayment before returning protected content",
+        "Returns HTTP 402 with PAYMENT-REQUIRED when no PAYMENT-SIGNATURE header is present",
+        "Base64-encoded PAYMENT-REQUIRED includes x402Version: 2, accepts array, permit2 assetTransferMethod, and eip2612GasSponsoring extension",
+        "Maps invalid-header to HTTP 400",
+        "Maps verify-failed to HTTP 402 with a fresh PAYMENT-REQUIRED header",
+        "Maps verify-unreachable and settle-unreachable to HTTP 502",
+        "Maps settle-failed to HTTP 402 with PAYMENT-RESPONSE failure metadata",
+        "Maps settled to protected content with PAYMENT-RESPONSE settlement metadata",
+        "Exposes PAYMENT-REQUIRED and PAYMENT-RESPONSE in CORS headers",
+        "Leaves deployment as a handoff to a Cloudflare, Wrangler, Railway, or platform-specific skill"
+    ],
+    "success_criteria": [
+        "No deployment commands are run or recommended as part of x402 integration",
+        "No production configuration, secrets, domains, or infrastructure settings are changed",
+        "Amount uses 6-decimal raw units: '1000' for 0.001 SBC",
+        "Radius testnet facilitator is https://facilitator.testnet.radiustech.xyz",
+        "SBC token address is 0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb",
+        "The endpoint is payment-ready and can be validated with curl -i before platform deployment"
+    ]
+}

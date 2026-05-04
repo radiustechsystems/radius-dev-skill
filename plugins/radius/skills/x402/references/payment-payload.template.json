@@ -1,0 +1,54 @@
+{
+  "x402Version": 2,
+  "scheme": "exact",
+  "network": "eip155:72344",
+  "resource": {
+    "url": "<RESOURCE_URL>",
+    "description": "",
+    "mimeType": "application/json"
+  },
+  "accepted": {
+    "scheme": "exact",
+    "network": "eip155:72344",
+    "amount": "<PAYMENT_AMOUNT_RAW_UNITS>",
+    "asset": "0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb",
+    "payTo": "<PAY_TO_ADDRESS>",
+    "maxTimeoutSeconds": 300,
+    "extra": {
+      "name": "Stable Coin",
+      "version": "1",
+      "assetTransferMethod": "permit2"
+    }
+  },
+  "payload": {
+    "signature": "<PERMIT2_SIGNATURE>",
+    "permit2Authorization": {
+      "permitted": {
+        "token": "0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb",
+        "amount": "<PAYMENT_AMOUNT_RAW_UNITS>"
+      },
+      "from": "<OWNER_ADDRESS>",
+      "spender": "0x402085c248EeA27D92E8b30b2C58ed07f9E20001",
+      "nonce": "<RANDOM_PERMIT2_NONCE>",
+      "deadline": "<UNIX_DEADLINE>",
+      "witness": {
+        "to": "<PAY_TO_ADDRESS>",
+        "validAfter": "0"
+      }
+    }
+  },
+  "extensions": {
+    "eip2612GasSponsoring": {
+      "info": {
+        "from": "<OWNER_ADDRESS>",
+        "asset": "0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb",
+        "spender": "0x000000000022D473030F116dDEE9F6B43aC78BA3",
+        "amount": "<PAYMENT_AMOUNT_RAW_UNITS>",
+        "nonce": "<EIP2612_NONCE_FROM_TOKEN>",
+        "deadline": "<UNIX_DEADLINE>",
+        "signature": "<EIP2612_SIGNATURE>",
+        "version": "1"
+      }
+    }
+  }
+}

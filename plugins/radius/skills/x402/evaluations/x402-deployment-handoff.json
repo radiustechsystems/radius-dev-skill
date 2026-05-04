@@ -1,0 +1,21 @@
+{
+    "name": "x402 Endpoint Deployment Handoff",
+    "skills": ["x402"],
+    "query": "Deploy an x402-gated endpoint on Radius testnet that charges 0.001 SBC per request. Use whatever deployment skill is appropriate after the endpoint works locally.",
+    "context": "The user explicitly wants deployment, but x402 skill ownership is payment behavior rather than infrastructure. The correct behavior is to implement and validate x402 locally or in the existing app, then hand off to a platform-specific deployment skill such as Cloudflare, Wrangler, or Railway based on the project target.",
+    "expected_behavior": [
+        "Implements or instructs implementation of x402 payment gating before protected content is returned",
+        "Uses Radius testnet x402 config with facilitator https://facilitator.testnet.radiustech.xyz, network eip155:72344, SBC asset, payTo, and amount 1000",
+        "Validates unpaid behavior with curl -i and confirms HTTP 402 plus PAYMENT-REQUIRED",
+        "Checks decoded PAYMENT-REQUIRED includes x402Version 2, accepts array, permit2 assetTransferMethod, and eip2612GasSponsoring extension",
+        "After local validation, invokes or clearly hands off to the relevant deployment skill selected from the user's project context",
+        "Does not stop with deployment out of scope when deployment was explicitly requested"
+    ],
+    "success_criteria": [
+        "Endpoint behavior is payment-ready before deployment",
+        "No production secrets or infrastructure settings are changed until the deployment skill handles that phase",
+        "The deployment phase is routed to a platform-specific skill rather than implemented ad hoc inside x402",
+        "The final deployed endpoint can be checked with curl -i for PAYMENT-REQUIRED",
+        "Amount uses 6-decimal raw units: 1000 for 0.001 SBC"
+    ]
+}

@@ -1,0 +1,30 @@
+{
+    "name": "x402 CLI Cast Access Without Node",
+    "skills": ["x402"],
+    "query": "Access this Radius testnet x402-gated endpoint once from the terminal. I have a funded Foundry keystore account named radius-payer and wallet address 0x1111111111111111111111111111111111111111. Do not create a Node project or JavaScript script.",
+    "context": "The user wants a one-off paid request to an existing x402 endpoint. They explicitly want a terminal flow and already have a funded Foundry keystore account. The endpoint returns x402 v2 PAYMENT-REQUIRED headers and supports Radius testnet with EIP-2612 gas sponsoring.",
+    "expected_behavior": [
+        "Uses the x402 CLI/cast reference rather than the viem app-client flow",
+        "Uses curl, jq, base64, python3, and cast; does not create a package.json, Node project, or JavaScript script",
+        "Fetches the endpoint once without payment and reads the PAYMENT-REQUIRED response header",
+        "Base64-decodes PAYMENT-REQUIRED and selects accepts[0] as the singular accepted object",
+        "Reads the EIP-2612 nonce with cast call against SBC nonces(address)(uint256)",
+        "Generates a random Permit2 nonce with a shell-friendly snippet",
+        "Builds EIP-2612 and Permit2 typed-data JSON without relying on repo-relative template paths",
+        "Includes EIP712Domain in typed-data types for cast signing",
+        "Signs both typed-data files with cast wallet sign --data --from-file --account radius-payer",
+        "Builds the final PAYMENT-SIGNATURE payload with accepted, payload.permit2Authorization, and extensions.eip2612GasSponsoring.info",
+        "Keeps final payload uint256-like fields as decimal strings",
+        "Sends PAYMENT-SIGNATURE and decodes PAYMENT-RESPONSE for inspection"
+    ],
+    "success_criteria": [
+        "No command reads plugins/radius/skills/x402/references/*.template.json",
+        "No raw private key is requested, logged, or passed as a CLI argument",
+        "The server response field accepts is not sent directly as a top-level accepts field in the client payload",
+        "The client payload uses singular accepted",
+        "EIP-2612 spender is the Permit2 contract 0x000000000022D473030F116dDEE9F6B43aC78BA3",
+        "Permit2 spender is the x402 Proxy 0x402085c248EeA27D92E8b30b2C58ed07f9E20001",
+        "Network uses eip155:72344 and chain ID 72344 for Radius testnet",
+        "The flow can be run from an arbitrary project directory"
+    ]
+}

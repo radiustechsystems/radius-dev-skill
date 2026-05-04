@@ -73,6 +73,22 @@ Use this Skill when the user asks for:
 - Failed transactions do NOT charge gas.
 - If a sender has SBC but not enough RUSD, the Turnstile converts SBC → RUSD inline. Conversion limits: minimum 0.1 SBC, maximum 10.0 SBC per trigger. One-way (SBC→RUSD only). Zero gas overhead. Requires sender to hold ≥0.1 SBC.
 
+## Wallet conventions
+
+Use the wallet shape that matches the workflow:
+
+- **Existing CLI / Foundry / cast wallets:** use named Foundry keystore accounts. Create them with `cast wallet import <name> --interactive`, then sign or send with `--account <name>`. Expose `CAST_ACCOUNT=<name>` and derive addresses with `cast wallet address --account "$CAST_ACCOUNT"` when possible.
+- **Agent-created testnet wallets:** use the local bootstrap helper, then consume the generated env file from viem/app-code flows:
+  ```bash
+  node plugins/radius/skills/radius-dev/scripts/radius-wallet-bootstrap.mjs --name radius-demo --network testnet
+  set -a; . .radius/wallets/radius-demo.env; set +a
+  ```
+  The helper writes `.radius/wallets/<name>.env` with `0600` permissions, creates `.radius/.gitignore`, prints only non-secret values, and refuses non-testnet wallet creation.
+- **App code / viem examples:** private keys may come from environment variables such as `PRIVATE_KEY` or `RADIUS_PRIVATE_KEY`, loaded from `.env`, `.radius/wallets/<name>.env`, or a secrets manager. Never inline or log them.
+- **Never pass raw keys as CLI arguments.** Do not use `--private-key` in commands; it can leak through shell history and process listings.
+
+Other Radius skills should follow this convention instead of defining one-off wallet handling.
+
 ## Canonical chain definitions
 
 Standard `defineChain`:
@@ -174,7 +190,7 @@ Always be explicit about:
 - Sub-second finality (no need to wait for multiple confirmations)
 - SBC uses 6 decimals (use `parseUnits(amount, 6)`, NOT `parseEther`)
 - RUSD (native token) uses 18 decimals (use `parseEther` for native transfers)
-- Foundry keystore for CLI deploys (`--account`), environment variables for TypeScript — never pass private keys as CLI arguments
+- The wallet convention above: Foundry keystore accounts for existing CLI wallets, bootstrap-helper env wallets for fresh testnet agent flows, environment-backed private keys for app code, and no raw keys in CLI arguments
 - Gas price from `eth_gasPrice` RPC (viem handles this automatically via the chain definition)
 
 ### 4. Watch for production gotchas
@@ -188,6 +204,7 @@ Before shipping, review [gotchas.md](references/gotchas.md) for:
 ### 5. Test
 - Smart contracts: `forge test` locally, then deploy to Radius Testnet
 - TypeScript scripts: Run against testnet RPC with funded test accounts
+- Fresh agent testnet wallets: use `scripts/radius-wallet-bootstrap.mjs`, then source `.radius/wallets/<name>.env`
 - Get testnet tokens: use the **dripping-faucet** skill for programmatic access, or the [web faucet](https://testnet.radiustech.xyz/wallet) manually
 - Verify deployments: `cast code <address> --rpc-url https://rpc.testnet.radiustech.xyz`
 
@@ -222,4 +239,5 @@ When you implement changes, provide:
 - Micropayment patterns: [micropayments.md](references/micropayments.md)
 - Production gotchas: [gotchas.md](references/gotchas.md)
 - Security checklist: [security.md](references/security.md)
+- Agent testnet wallet helper: [scripts/radius-wallet-bootstrap.mjs](scripts/radius-wallet-bootstrap.mjs)
 - Curated reference links: [resources.md](references/resources.md)

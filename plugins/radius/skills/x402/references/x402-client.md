@@ -43,7 +43,7 @@ const permitTypes = {
 // Message values:
 // owner     = your wallet address
 // spender   = Permit2 contract: 0x000000000022D473030F116dDEE9F6B43aC78BA3
-// value     = Permit2 approval amount (commonly max uint256; must cover the payment)
+// value     = the payment amount (must equal accepts[i].amount; the Radius proxy reverts Permit2612AmountMismatch() otherwise)
 // nonce     = read from SBC contract: nonces(ownerAddress) — sequential, starts at 0
 // deadline  = Unix timestamp (e.g. now + 300 seconds)
 ```
@@ -154,7 +154,7 @@ export async function signX402Payment({
   const cfg = { ...RADIUS_DEFAULTS, ...config };
   const deadline = BigInt(Math.floor(Date.now() / 1000) + 300);
   const amount = accepted.amount;
-  const approvalAmount = (2n ** 256n - 1n).toString();
+  const approvalAmount = amount; // Radius proxy requires EIP-2612 value == Permit2 transfer amount
 
   // 1. Sign EIP-2612 permit (approve Permit2 contract to spend SBC)
   const eip2612Signature = await signTypedData({
@@ -293,6 +293,14 @@ async function getPermitNonce(owner: `0x${string}`): Promise<bigint> {
   });
 }
 ```
+
+---
+
+## One-off CLI access
+
+For fresh agent-created testnet wallets, use the radius-dev wallet bootstrap helper and this viem/app-client path. The helper writes `PRIVATE_KEY`, `RADIUS_PRIVATE_KEY`, `OWNER`, and `PAYMENT_ADDRESS` to `.radius/wallets/<name>.env`.
+
+For a no-Node, no-JS-project flow using `curl`, `jq`, `base64`, and Foundry `cast`, use [x402-cli-cast.md](x402-cli-cast.md) only when the user already has a funded Foundry keystore account. This app-client reference keeps the viem/browser-wallet path only.
 
 ---
 

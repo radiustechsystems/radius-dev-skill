@@ -6,8 +6,8 @@ description: |
   consume a paid x402 API, sign x402 payment headers, integrate with a facilitator service,
   implement EIP-2612 permit + Permit2 payment signing, build pay-per-call services on Radius
   using SBC token, or set up x402 middleware. Covers both server-side (protect your endpoints
-  with payment gating) and client-side (sign and pay for x402-protected endpoints). Uses raw
-  viem for all signing — no SDK dependencies beyond viem.
+  with payment gating) and client-side (sign and pay for x402-protected endpoints). Use viem
+  for app code signing, or Foundry cast for one-off CLI payment access.
 published: true
 user-invocable: true
 ---
@@ -26,7 +26,7 @@ Use this Skill when the user asks to:
 - Understand the x402 HTTP 402 payment flow
 - Set up x402 middleware for a server
 
-**Not this Skill:** For dApp development on Radius (wagmi, Foundry, event watching), use the **radius-dev** skill. For programmatic on-chain operations from agent code (balance checks, token transfers, contract interaction via wallet libraries), use the **radius-agent-ops** skill. For getting testnet/mainnet tokens, use the **dripping-faucet** skill. For direct on-chain payment patterns (pay-per-visit paywalls, streaming payments) that don't use x402 facilitators, see radius-dev's [micropayments.md](../radius-dev/references/micropayments.md).
+**Not this Skill:** For dApp development on Radius (wagmi, Foundry, event watching), use the **radius-dev** skill. For programmatic on-chain operations from agent code (balance checks, token transfers, contract interaction via wallet libraries), use the **radius-agent-ops** skill. For getting testnet/mainnet tokens, use the **dripping-faucet** skill. For direct on-chain payment patterns (pay-per-visit paywalls, streaming payments) that don't use x402 facilitators, see radius-dev's [micropayments.md](../radius-dev/references/micropayments.md). For platform deployment, hosting, domains, or infrastructure operations, use the relevant deployment skill (for example Cloudflare, Wrangler, Railway) after the x402 endpoint behavior is implemented.
 
 ## Protocol overview
 
@@ -177,6 +177,15 @@ No SBC? Use the **dripping-faucet** skill to get tokens.
 
 Radius-operated facilitators support EIP-2612 gas sponsoring for first-time wallets. Some third-party facilitators may require fresh wallets to pre-approve the Permit2 contract before their first payment. See the [pre-approval helper](references/x402-client.md#third-party-facilitators-pre-approving-permit2).
 
+**4. Wallet signing convention**
+
+Follow the shared Radius wallet convention from the **radius-dev** skill:
+
+- Fresh one-shot agent demos should use the radius-dev testnet wallet bootstrap helper and the viem client path from [x402-client.md](references/x402-client.md).
+- One-off terminal access with [x402-cli-cast.md](references/x402-cli-cast.md) is for pre-existing Foundry keystore accounts via `CAST_ACCOUNT=<name>` and `cast wallet sign --account "$CAST_ACCOUNT"`.
+- App-code clients may load `PRIVATE_KEY` from the environment for viem signing.
+- Never request, log, hardcode, or pass raw private keys as CLI arguments such as `--private-key`.
+
 ## Operating procedure
 
 ### A. "I want to monetize my API with x402" (server-side)
@@ -185,16 +194,17 @@ Radius-operated facilitators support EIP-2612 gas sponsoring for first-time wall
 2. **Create your x402 payment module** — copy the `processPayment()` pattern from [x402-server.md](references/x402-server.md)
 3. **Wire into your request handler** — call `processPayment()` for protected routes; it returns a typed outcome you map to HTTP responses
 4. **Set environment variables** — `PAYMENT_ADDRESS` (your wallet) and optionally `FACILITATOR_API_KEY`
-5. **Deploy and test** — `curl` your endpoint to verify it returns 402 with correct requirements
+5. **Test the endpoint behavior** — `curl` your local or already-hosted endpoint to verify it returns 402 with correct requirements
 6. **Handle all outcome states** — see the exhaustive switch in [x402-server.md](references/x402-server.md)
 7. **Get discovered** — register your service with x402 discovery endpoints so agents and buyers can find it programmatically. Facilitators that implement the `/discovery/resources` convention serve a machine-readable catalog of available services. See [x402-client.md § Discovering services](references/x402-client.md#discovering-x402-services) for the response format and known discovery endpoints.
+8. **Deploy separately if needed** — after local or existing-host validation, invoke the user's Cloudflare, Wrangler, Railway, or platform-specific skill to deploy. Do not stop at "deployment is out of scope" when the user explicitly asks for deployment; hand off after the x402 behavior is correct.
 
 ### B. "I want to consume a paid x402 API" (client-side)
 
 1. **Discover services** — query `/discovery/resources` endpoints to find available x402 services programmatically. See [x402-client.md § Discovering services](references/x402-client.md#discovering-x402-services) for code and known endpoints. Any HTTP endpoint that returns 402 with a `PAYMENT-REQUIRED` header is also an x402 service — the 402 response itself is a discovery mechanism.
 2. **Request the endpoint** — receive 402 with payment requirements in the `PAYMENT-REQUIRED` header
 3. **Parse the requirements** — base64-decode `PAYMENT-REQUIRED` and select `accepts[0]`
-4. **Sign both permits** — use `signX402Payment()` from [x402-client.md](references/x402-client.md)
+4. **Sign both permits** — for fresh agent-created testnet wallets and app code, use `signX402Payment()` from [x402-client.md](references/x402-client.md); for pre-existing Foundry keystore accounts, use [x402-cli-cast.md](references/x402-cli-cast.md)
 5. **Retry with payment** — set the `PAYMENT-SIGNATURE` header to the base64-encoded payload
 6. **Receive data** — 200 response with the paid content
 
@@ -204,7 +214,9 @@ Radius-operated facilitators support EIP-2612 gas sponsoring for first-time wall
 |----------|----------|---------|-------------|
 | `PAYMENT_ADDRESS` | Server | Server | Wallet address that receives SBC payments |
 | `FACILITATOR_API_KEY` | No | Server | Optional API key for the facilitator |
-| `PRIVATE_KEY` | Client scripts | Client | Private key for signing permits (never log this) |
+| `PRIVATE_KEY` | Client scripts | Client | Environment-provided private key for viem signing; never inline or log this |
+| `RADIUS_PRIVATE_KEY` | Client scripts | Client | Alias written by the testnet wallet bootstrap helper for Radius app-code examples |
+| `CAST_ACCOUNT` | CLI examples | Client | Pre-existing Foundry keystore account name for `cast wallet sign --account`; not used for fresh helper-created env wallets |
 
 ## Gotchas
 
@@ -215,18 +227,24 @@ Radius-operated facilitators support EIP-2612 gas sponsoring for first-time wall
 | EIP-2612 domain name | `"SBC"` or `"Stablecoin"` | `"Stable Coin"` (exact, with space). Matters for first payment from a wallet (establishes Permit2 allowance on-chain). |
 | EIP-2612 spender | Using payTo address or x402 Proxy | Spender = **Permit2 contract** (`0x0000...8BA3`). Matters for first payment. |
 | Only signing one permit | Sign just EIP-2612 or just Permit2 | Must sign **both** — EIP-2612 + Permit2. The EIP-2612 establishes Permit2 allowance; Permit2 authorizes the transfer. |
+| **EIP-2612 `value` ≠ payment `amount`** | `value: 2n**256n - 1n` (max uint256) | `value` must equal `accepts[0].amount`. The Radius x402 Proxy reverts `Permit2612AmountMismatch()` (selector `0x050cda49`); facilitator still reports `success: true`, so the failure is silent unless you check the on-chain receipt. |
 | Wrong network facilitator | Using the mainnet facilitator for testnet or the testnet facilitator for mainnet | Use `https://facilitator.radiustech.xyz` for `eip155:723487` and `https://facilitator.testnet.radiustech.xyz` for `eip155:72344` |
 | Third-party first-time wallet | Assuming every facilitator sponsors first-time EIP-2612 Permit2 allowance setup | Check `/supported`; if gas sponsoring is unavailable, pre-approve Permit2 via `permit()` on SBC before first payment |
 | Address casing | Comparing addresses with `===` | Always compare case-insensitively or normalize with viem's `getAddress()` |
 | Missing EIP-2612 nonce | Hardcoding nonce to 0 | Read from token: `nonces(address)` on SBC contract |
 | Permit2 nonce | Sequential nonce | Random nonce (crypto random bytes) |
 | Expired deadline | Static deadline from build time | Compute at sign time: `Math.floor(Date.now() / 1000) + 300` |
+| `accepts` vs `accepted` | Sending the full server `accepts` array as `accepted` | Server returns `accepts: [...]`; client sends one selected requirement as singular `accepted: {...}` |
+| Hand-written integer JSON | Writing final payload `uint256` fields as numbers | Use decimal strings for final payload integer fields, e.g. `"amount": "100"` |
+| Non-viem EIP-712 signing | Omitting `EIP712Domain` from typed-data `types` | Include `EIP712Domain` when signing with tools such as `cast wallet sign --data` |
 
 > **Testing insight:** The facilitator validates the Permit2 signature on every request. The EIP-2612
 > gas sponsoring signature is used on-chain to establish the Permit2 contract's token allowance.
 > After a wallet's first successful payment, subsequent payments may succeed even with an incorrect
 > EIP-2612 signature because the Permit2 allowance already exists. Always get both signatures right
-> — the EIP-2612 error will surface on the first payment from any new wallet.
+> — the EIP-2612 error will surface on the first payment from any new wallet. For first payments,
+> also confirm the on-chain receipt of `settlementResponse.txHash`: facilitator `success: true`
+> reflects that the settle tx was submitted, not that it succeeded on-chain.
 
 ## Progressive disclosure
 
@@ -240,10 +258,11 @@ Radius-operated facilitators support EIP-2612 gas sponsoring for first-time wall
 
 **Local references:**
 - Server-side implementation: [x402-server.md](references/x402-server.md)
-- Client-side signing: [x402-client.md](references/x402-client.md)
+- App client signing with viem/browser wallets: [x402-client.md](references/x402-client.md)
+- One-off CLI payment access with curl + cast: [x402-cli-cast.md](references/x402-cli-cast.md)
 - Facilitator API reference: [facilitator-api.md](references/facilitator-api.md)
 
 **Cross-references to other skills:**
-- Chain definitions, RPC, wallet setup, general Radius dev: **radius-dev** skill
+- Chain definitions, RPC, wallet conventions, general Radius dev: **radius-dev** skill
 - Get testnet/mainnet SBC tokens: **dripping-faucet** skill
 - Production gotchas (EIP-2612 domain, v-value, nonce collisions): radius-dev [gotchas.md](../radius-dev/references/gotchas.md)
