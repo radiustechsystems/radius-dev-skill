@@ -87,20 +87,11 @@ const permit2Types = {
 
 ---
 
-## signX402Payment function
+## Shared helpers
+
+These utilities are used by both `parsePaymentRequired` and `signX402Payment` below. Copy them once at the top of your client.
 
 ```typescript
-import { type Hex } from 'viem';
-
-const RADIUS_DEFAULTS = {
-  chainId: 723487,
-  tokenAddress: '0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb' as `0x${string}`,
-  tokenName: 'Stable Coin',
-  tokenVersion: '1',
-  permit2Address: '0x000000000022D473030F116dDEE9F6B43aC78BA3' as `0x${string}`,
-  x402Permit2Proxy: '0x402085c248EeA27D92E8b30b2C58ed07f9E20001' as `0x${string}`,
-};
-
 function randomPermit2Nonce(): bigint {
   const bytes = new Uint8Array(16);
   crypto.getRandomValues(bytes);
@@ -119,6 +110,54 @@ function decodeBase64Json<T = any>(encoded: string): T {
     : Buffer.from(encoded, 'base64').toString('utf8');
   return JSON.parse(json);
 }
+```
+
+---
+
+## parsePaymentRequired function
+
+Every client flow starts by parsing the 402 response — this is the canonical decoder. The `PAYMENT-REQUIRED` response header carries a base64-encoded JSON payload describing what the server wants paid.
+
+```typescript
+async function parsePaymentRequired(response: Response) {
+  if (response.status !== 402) return null;
+
+  const header = response.headers.get('PAYMENT-REQUIRED');
+  if (!header) throw new Error('Missing PAYMENT-REQUIRED header');
+
+  const body = decodeBase64Json(header);
+
+  // Validate x402 v2 format
+  if (body.x402Version !== 2 || !body.accepts?.length) {
+    throw new Error('Unexpected 402 response format');
+  }
+
+  return body;
+}
+```
+
+When the server offers multiple `accepts` entries (e.g. several networks or assets), select the one that matches your wallet's chain rather than blindly using `accepts[0]`:
+
+```typescript
+const accepted = paymentRequired.accepts.find((a) => a.network === `eip155:${chainId}`);
+if (!accepted) throw new Error(`No accepts entry for eip155:${chainId}`);
+```
+
+---
+
+## signX402Payment function
+
+```typescript
+import { type Hex } from 'viem';
+
+const RADIUS_DEFAULTS = {
+  chainId: 723487,
+  tokenAddress: '0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb' as `0x${string}`,
+  tokenName: 'Stable Coin',
+  tokenVersion: '1',
+  permit2Address: '0x000000000022D473030F116dDEE9F6B43aC78BA3' as `0x${string}`,
+  x402Permit2Proxy: '0x402085c248EeA27D92E8b30b2C58ed07f9E20001' as `0x${string}`,
+};
 
 interface SignX402Params {
   /** EIP-712 signTypedData function (from viem account or browser wallet) */
@@ -298,7 +337,16 @@ async function getPermitNonce(owner: `0x${string}`): Promise<bigint> {
 
 ## One-off CLI access
 
-For fresh agent-created testnet wallets, use the radius-dev wallet bootstrap helper and this viem/app-client path. The helper writes `PRIVATE_KEY`, `RADIUS_PRIVATE_KEY`, `OWNER`, and `PAYMENT_ADDRESS` to `.radius/wallets/<name>.env`.
+For an agent-bootstrapped testnet wallet, the fastest path is the **`scripts/x402-pay.mjs`** helper shipped with this skill. After sourcing the wallet env, paying any x402 endpoint is one command:
+
+```bash
+set -a; . .radius/wallets/<name>.env; set +a
+node ${CLAUDE_PLUGIN_ROOT}/skills/x402/scripts/x402-pay.mjs <url>
+```
+
+The helper inlines `signX402Payment` and `parsePaymentRequired` (defined above) and derives chain/RPC from the wallet env, so there is no copy-paste step. Use the functions in this reference directly when you need the signing logic embedded in your own app code.
+
+For fresh agent-created testnet wallets, use the radius-dev wallet bootstrap helper to produce the env file. The helper writes `PRIVATE_KEY`, `RADIUS_PRIVATE_KEY`, `OWNER`, and `PAYMENT_ADDRESS` to `.radius/wallets/<name>.env`.
 
 For a no-Node, no-JS-project flow using `curl`, `jq`, `base64`, and Foundry `cast`, use [x402-cli-cast.md](x402-cli-cast.md) only when the user already has a funded Foundry keystore account. This app-client reference keeps the viem/browser-wallet path only.
 
@@ -306,14 +354,15 @@ For a no-Node, no-JS-project flow using `curl`, `jq`, `base64`, and Foundry `cas
 
 ## Example: Node.js script consuming a paid API
 
-> Include `signX402Payment`, `RADIUS_DEFAULTS`, and `randomPermit2Nonce` from the section above.
+> Include the [Shared helpers](#shared-helpers) (`randomPermit2Nonce`, `encodeBase64Json`, `decodeBase64Json`), `parsePaymentRequired`, `signX402Payment`, and `RADIUS_DEFAULTS` from the sections above.
 
 ```typescript
 import { createPublicClient, http, parseAbi } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { defineChain } from 'viem';
 
-// Chain definition (see radius-dev skill)
+// Chain definition (see radius-dev skill).
+// For testnet: id 72344, RPC https://rpc.testnet.radiustech.xyz, explorer https://testnet.radiustech.xyz
 const radiusMainnet = defineChain({
   id: 723487,
   name: 'Radius Network',
@@ -339,7 +388,15 @@ async function callPaidApi(apiUrl: string) {
 
   const paymentRequired = await parsePaymentRequired(initialRes);
   if (!paymentRequired) throw new Error('Expected PAYMENT-REQUIRED response');
-  const accepted = paymentRequired.accepts[0];
+
+  // Pick the accepts[i] whose network matches our wallet's chain — never blindly accepts[0].
+  const chainId = publicClient.chain.id;
+  const accepted = paymentRequired.accepts.find((a) => a.network === `eip155:${chainId}`);
+  if (!accepted) {
+    throw new Error(
+      `No accepts entry for eip155:${chainId} (offered: ${paymentRequired.accepts.map((a) => a.network).join(', ')})`,
+    );
+  }
 
   // 2. Read EIP-2612 nonce
   const permitNonce = await publicClient.readContract({
@@ -349,13 +406,14 @@ async function callPaidApi(apiUrl: string) {
     args: [account.address],
   });
 
-  // 3. Sign payment
+  // 3. Sign payment — pass `config: { chainId }` so testnet/mainnet are not hardcoded.
   const { paymentSignature } = await signX402Payment({
     signTypedData: (params) => account.signTypedData(params),
     owner: account.address,
     permitNonce,
     resource: { url: apiUrl, description: `Access to ${new URL(apiUrl).pathname}` },
     accepted,
+    config: { chainId },
   });
 
   // 4. Retry with payment
@@ -374,7 +432,7 @@ callPaidApi('https://your-x402-api.example.com/api/data');
 
 ## Example: Browser wallet (wagmi/viem)
 
-> Include `signX402Payment`, `RADIUS_DEFAULTS`, and `randomPermit2Nonce` from the section above.
+> Include the [Shared helpers](#shared-helpers) (`randomPermit2Nonce`, `encodeBase64Json`, `decodeBase64Json`), `parsePaymentRequired`, `signX402Payment`, and `RADIUS_DEFAULTS` from the sections above.
 
 ```typescript
 import { useAccount, useWalletClient } from 'wagmi';
@@ -394,7 +452,15 @@ export function usePaidFetch() {
     if (initialRes.status !== 402) return initialRes.json();
     const paymentRequired = await parsePaymentRequired(initialRes);
     if (!paymentRequired) throw new Error('Expected PAYMENT-REQUIRED response');
-    const accepted = paymentRequired.accepts[0];
+
+    // Pick the accepts[i] whose network matches the connected wallet's chain.
+    const chainId = walletClient.chain.id;
+    const accepted = paymentRequired.accepts.find((a) => a.network === `eip155:${chainId}`);
+    if (!accepted) {
+      throw new Error(
+        `No accepts entry for eip155:${chainId} (offered: ${paymentRequired.accepts.map((a) => a.network).join(', ')})`,
+      );
+    }
 
     // 2. Read EIP-2612 nonce
     const publicClient = createPublicClient({
@@ -415,6 +481,7 @@ export function usePaidFetch() {
       permitNonce,
       resource: { url: apiUrl },
       accepted,
+      config: { chainId },
     });
 
     // 4. Retry with payment
@@ -432,26 +499,6 @@ export function usePaidFetch() {
 
 ## Error handling
 
-### Parsing 402 responses
-
-```typescript
-async function parsePaymentRequired(response: Response) {
-  if (response.status !== 402) return null;
-
-  const header = response.headers.get('PAYMENT-REQUIRED');
-  if (!header) throw new Error('Missing PAYMENT-REQUIRED header');
-
-  const body = decodeBase64Json(header);
-
-  // Validate x402 v2 format
-  if (body.x402Version !== 2 || !body.accepts?.length) {
-    throw new Error('Unexpected 402 response format');
-  }
-
-  return body;
-}
-```
-
 ### Handling payment failures
 
 After sending the `PAYMENT-SIGNATURE` header, the server may still return non-200:
@@ -465,14 +512,15 @@ After sending the `PAYMENT-SIGNATURE` header, the server may still return non-20
 
 ```typescript
 // Uses signX402Payment, getPermitNonce, and account from sections above.
-async function fetchWithRetry(apiUrl: string, maxRetries = 2) {
+async function fetchWithRetry(apiUrl: string, chainId: number, maxRetries = 2) {
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     const res = await fetch(apiUrl);
     if (res.status !== 402) return res;
 
     const paymentRequired = await parsePaymentRequired(res);
     if (!paymentRequired) throw new Error('Expected PAYMENT-REQUIRED response');
-    const accepted = paymentRequired.accepts[0];
+    const accepted = paymentRequired.accepts.find((a) => a.network === `eip155:${chainId}`);
+    if (!accepted) throw new Error(`No accepts entry for eip155:${chainId}`);
     const permitNonce = await getPermitNonce(account.address);
 
     const { paymentSignature } = await signX402Payment({
@@ -481,6 +529,7 @@ async function fetchWithRetry(apiUrl: string, maxRetries = 2) {
       permitNonce,
       resource: { url: apiUrl },
       accepted,
+      config: { chainId },
     });
 
     const paidRes = await fetch(apiUrl, { headers: { 'PAYMENT-SIGNATURE': paymentSignature } });

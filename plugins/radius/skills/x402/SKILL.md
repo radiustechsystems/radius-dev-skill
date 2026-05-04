@@ -201,10 +201,21 @@ Follow the shared Radius wallet convention from the **radius-dev** skill:
 
 ### B. "I want to consume a paid x402 API" (client-side)
 
+**Fast path for an agent-bootstrapped testnet wallet:** after `radius-wallet-bootstrap.mjs` writes `.radius/wallets/<name>.env` and the dripping-faucet skill funds it, paying any x402 endpoint is one command:
+
+```bash
+set -a; . .radius/wallets/<name>.env; set +a
+node ${CLAUDE_PLUGIN_ROOT}/skills/x402/scripts/x402-pay.mjs <url> [--max-amount <raw>]
+```
+
+The helper handles the full flow below (parse 402 → pick the `accepts` entry matching the wallet's network → sign EIP-2612 + Permit2 → retry with `PAYMENT-SIGNATURE`) and prints structured `key=value` output. Requires `viem >= 2.0.0` installed in the cwd. Use the manual flow below when embedding signing into app code or when you need browser-wallet popups.
+
+> **Mainnet:** always pass `--max-amount <raw>` (raw 6-decimal SBC units; e.g. `10000` = 0.01 SBC). Mainnet payments are real money and the helper will sign whatever amount the endpoint requests.
+
 1. **Discover services** — query `/discovery/resources` endpoints to find available x402 services programmatically. See [x402-client.md § Discovering services](references/x402-client.md#discovering-x402-services) for code and known endpoints. Any HTTP endpoint that returns 402 with a `PAYMENT-REQUIRED` header is also an x402 service — the 402 response itself is a discovery mechanism.
 2. **Request the endpoint** — receive 402 with payment requirements in the `PAYMENT-REQUIRED` header
-3. **Parse the requirements** — base64-decode `PAYMENT-REQUIRED` and select `accepts[0]`
-4. **Sign both permits** — for fresh agent-created testnet wallets and app code, use `signX402Payment()` from [x402-client.md](references/x402-client.md); for pre-existing Foundry keystore accounts, use [x402-cli-cast.md](references/x402-cli-cast.md)
+3. **Parse the requirements** — base64-decode `PAYMENT-REQUIRED` with `parsePaymentRequired()` from [x402-client.md](references/x402-client.md) and select the `accepts[i]` whose `network` matches your wallet's chain (do not blindly pick `accepts[0]`)
+4. **Sign both permits** — for one-shot agent runs use `scripts/x402-pay.mjs` (above); for app code, use `signX402Payment()` from [x402-client.md](references/x402-client.md); for pre-existing Foundry keystore accounts, use [x402-cli-cast.md](references/x402-cli-cast.md)
 5. **Retry with payment** — set the `PAYMENT-SIGNATURE` header to the base64-encoded payload
 6. **Receive data** — 200 response with the paid content
 
@@ -261,6 +272,9 @@ Follow the shared Radius wallet convention from the **radius-dev** skill:
 - App client signing with viem/browser wallets: [x402-client.md](references/x402-client.md)
 - One-off CLI payment access with curl + cast: [x402-cli-cast.md](references/x402-cli-cast.md)
 - Facilitator API reference: [facilitator-api.md](references/facilitator-api.md)
+
+**Scripts:**
+- One-shot env-bootstrapped payment helper: `scripts/x402-pay.mjs` (used by §B fast path above)
 
 **Cross-references to other skills:**
 - Chain definitions, RPC, wallet conventions, general Radius dev: **radius-dev** skill
