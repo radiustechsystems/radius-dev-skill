@@ -9,7 +9,6 @@
         "Ensures .radius/.gitignore prevents generated wallet files from being committed",
         "Loads PRIVATE_KEY or RADIUS_PRIVATE_KEY from the generated env file for viem app-code signing",
         "Prints or reports only non-secret values such as OWNER, PAYMENT_ADDRESS, network, chain ID, RPC URL, and env file path",
-        "Refuses to create an agent-managed mainnet wallet",
         "Does not use Foundry keystore prompts for this fresh agent-created testnet wallet"
     ],
     "success_criteria": [

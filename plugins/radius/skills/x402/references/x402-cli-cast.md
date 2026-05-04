@@ -2,7 +2,7 @@
 
 Use this reference when the user wants to access an x402-gated endpoint once from a terminal or agent shell without creating a Node project or JavaScript script, and they already have a funded Foundry keystore account.
 
-For fresh agent-created testnet wallets, do not use this cast flow. Use the radius-dev wallet bootstrap helper and the viem client path in [x402-client.md](x402-client.md).
+For fresh agent-created wallets, do not use this cast flow. Use the radius-dev wallet bootstrap helper and the viem client path in [x402-client.md](x402-client.md).
 
 Prerequisites:
 - `curl`, `jq`, `base64`, `python3`

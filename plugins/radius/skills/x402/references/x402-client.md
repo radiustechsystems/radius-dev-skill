@@ -337,7 +337,7 @@ async function getPermitNonce(owner: `0x${string}`): Promise<bigint> {
 
 ## One-off CLI access
 
-For an agent-bootstrapped testnet wallet, the fastest path is the **`scripts/x402-pay.mjs`** helper shipped with this skill. After sourcing the wallet env, paying any x402 endpoint is one command:
+For an agent-bootstrapped wallet (testnet or mainnet), the fastest path is the **`scripts/x402-pay.mjs`** helper shipped with this skill. After sourcing the wallet env, paying any x402 endpoint is one command:
 
 ```bash
 set -a; . .radius/wallets/<name>.env; set +a
@@ -346,7 +346,7 @@ node ${CLAUDE_PLUGIN_ROOT}/skills/x402/scripts/x402-pay.mjs <url>
 
 The helper inlines `signX402Payment` and `parsePaymentRequired` (defined above) and derives chain/RPC from the wallet env, so there is no copy-paste step. Use the functions in this reference directly when you need the signing logic embedded in your own app code.
 
-For fresh agent-created testnet wallets, use the radius-dev wallet bootstrap helper to produce the env file. The helper writes `PRIVATE_KEY`, `RADIUS_PRIVATE_KEY`, `OWNER`, and `PAYMENT_ADDRESS` to `.radius/wallets/<name>.env`.
+For fresh agent-created wallets, use the radius-dev wallet bootstrap helper to produce the env file. The helper writes `PRIVATE_KEY`, `RADIUS_PRIVATE_KEY`, `OWNER`, and `PAYMENT_ADDRESS` to `.radius/wallets/<name>.env`.
 
 For a no-Node, no-JS-project flow using `curl`, `jq`, `base64`, and Foundry `cast`, use [x402-cli-cast.md](x402-cli-cast.md) only when the user already has a funded Foundry keystore account. This app-client reference keeps the viem/browser-wallet path only.
 

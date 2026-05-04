@@ -181,7 +181,7 @@ Radius-operated facilitators support EIP-2612 gas sponsoring for first-time wall
 
 Follow the shared Radius wallet convention from the **radius-dev** skill:
 
-- Fresh one-shot agent demos should use the radius-dev testnet wallet bootstrap helper and the viem client path from [x402-client.md](references/x402-client.md).
+- Fresh one-shot agent demos should use the radius-dev wallet bootstrap helper and the viem client path from [x402-client.md](references/x402-client.md).
 - One-off terminal access with [x402-cli-cast.md](references/x402-cli-cast.md) is for pre-existing Foundry keystore accounts via `CAST_ACCOUNT=<name>` and `cast wallet sign --account "$CAST_ACCOUNT"`.
 - App-code clients may load `PRIVATE_KEY` from the environment for viem signing.
 - Never request, log, hardcode, or pass raw private keys as CLI arguments such as `--private-key`.
@@ -201,7 +201,7 @@ Follow the shared Radius wallet convention from the **radius-dev** skill:
 
 ### B. "I want to consume a paid x402 API" (client-side)
 
-**Fast path for an agent-bootstrapped testnet wallet:** after `radius-wallet-bootstrap.mjs` writes `.radius/wallets/<name>.env` and the dripping-faucet skill funds it, paying any x402 endpoint is one command:
+**Fast path for an agent-bootstrapped wallet:** after `radius-wallet-bootstrap.mjs` writes `.radius/wallets/<name>.env` (testnet or mainnet) and the dripping-faucet skill funds it, paying any x402 endpoint is one command:
 
 ```bash
 set -a; . .radius/wallets/<name>.env; set +a
@@ -226,7 +226,7 @@ The helper handles the full flow below (parse 402 → pick the `accepts` entry m
 | `PAYMENT_ADDRESS` | Server | Server | Wallet address that receives SBC payments |
 | `FACILITATOR_API_KEY` | No | Server | Optional API key for the facilitator |
 | `PRIVATE_KEY` | Client scripts | Client | Environment-provided private key for viem signing; never inline or log this |
-| `RADIUS_PRIVATE_KEY` | Client scripts | Client | Alias written by the testnet wallet bootstrap helper for Radius app-code examples |
+| `RADIUS_PRIVATE_KEY` | Client scripts | Client | Alias written by the wallet bootstrap helper for Radius app-code examples |
 | `CAST_ACCOUNT` | CLI examples | Client | Pre-existing Foundry keystore account name for `cast wallet sign --account`; not used for fresh helper-created env wallets |
 
 ## Gotchas

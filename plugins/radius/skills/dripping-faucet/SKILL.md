@@ -66,7 +66,7 @@ SBC uses **6 decimals**. Always `parseUnits(amount, 6)` / `formatUnits(balance, 
 These are mandatory, not advisory. Violating any of them is a skill failure.
 
 1. **Never log or display private keys.** Only log the wallet address.
-2. **Fresh agent testnet wallets**: use `radius-dev/scripts/radius-wallet-bootstrap.mjs`, then load `.radius/wallets/<name>.env` for viem/app-code flows.
+2. **Fresh agent wallets**: use `radius-dev/scripts/radius-wallet-bootstrap.mjs`, then load `.radius/wallets/<name>.env` for viem/app-code flows.
 3. **TypeScript**: load keys from `process.env.PRIVATE_KEY`. Store in `.env`, `.radius/wallets/<name>.env`, or a secrets manager; never inline.
 4. **Bash / Foundry**: follow the Radius CLI wallet convention for existing keystores: use `cast wallet import <name> --interactive` to create an encrypted keystore, set `CAST_ACCOUNT=<name>`, derive the address with `cast wallet address --account "$CAST_ACCOUNT"`, then sign with `cast wallet sign --account "$CAST_ACCOUNT"`. Never pass raw keys as CLI arguments such as `--private-key` — they are visible in process listings.
 5. **`.env` and `.radius/` must be in `.gitignore`.** Verify before proceeding.
@@ -81,7 +81,7 @@ Before calling the faucet, determine the wallet situation. This decides which fl
 
 1. **Does the user already have a wallet address?**
    - No and target is testnet → create one with the radius-dev wallet bootstrap helper. You now own an env-backed testnet key and should use viem/app-code signing, not cast keystore signing.
-   - No and target is mainnet → stop. Mainnet wallets should be user-managed; direct the user to provide an existing wallet or use the web faucet.
+   - No and target is mainnet → create one with the radius-dev wallet bootstrap helper using `--network mainnet`. You now own an env-backed mainnet key. Mainnet tokens have real value and the faucet allows only 1 drip/day.
    - Yes → continue to question 2.
 
 2. **Do we have access to key material or a named Foundry keystore for that address?**
@@ -186,7 +186,7 @@ const radiusTestnet = defineChain({
 // Option B: We only have an address (no key — unsigned flow only; mainnet will always fail)
 // const addressOnly = '0x...' as `0x${string}`;
 
-// Option C: Create a new throwaway wallet (we own the key — valid for testnet only)
+// Option C: Create a new wallet (we own the key)
 const privateKey = generatePrivateKey();
 const account = privateKeyToAccount(privateKey);
 // SECURITY: only log the address, never the key
@@ -326,14 +326,16 @@ console.log('Testnet result:', JSON.stringify(testnetResult, null, 2));
 // mainnet_signature_required_but_no_key — mainnet always requires a signature.
 ```
 
-## Agent-created testnet wallet
+## Agent-created wallet
 
-For a fresh testnet wallet in an agent demo, use the radius-dev helper and then run the TypeScript/viem flow above:
+For a fresh wallet in an agent demo, use the radius-dev helper and then run the TypeScript/viem flow above:
 
 ```bash
 node plugins/radius/skills/radius-dev/scripts/radius-wallet-bootstrap.mjs --name radius-demo --network testnet
 set -a; . .radius/wallets/radius-demo.env; set +a
 ```
+
+For a mainnet wallet, pass `--network mainnet` — the helper writes the mainnet chain ID and RPC into the env file.
 
 Use `OWNER` as the faucet address. If the faucet requires a signature, use the env-backed viem signer from `PRIVATE_KEY`; do not switch to `cast wallet sign` unless the user already has a Foundry keystore account.
 
@@ -526,7 +528,7 @@ These mistakes are easy to make and have been observed in practice:
 | Unsigned flow on mainnet | Sending a `/drip` request without a signature to the mainnet faucet and waiting for it to succeed | Mainnet **always** returns `signature_required`. Either go straight to the signed flow, or fail fast if you don't have the key |
 | Retrying after mainnet rate limit | Looping on a `rate_limited` error from mainnet with the same wait-and-retry logic used on testnet | Mainnet `retry_after_ms` is ~86 400 000 ms (24 hours). Stop immediately, report the wait time to the user, and do not retry in-process |
 | Using testnet chain for mainnet on-chain check | Hardcoding `chain: radiusTestnet` in `createPublicClient` regardless of network → `balanceOf` query goes to the wrong chain, always returns 0 | Derive the chain from the `network` parameter; use `NETWORK_CONFIG[network].chain` |
-| Creating a throwaway mainnet wallet | Generating `generatePrivateKey()` and dripping to it on mainnet | Mainnet tokens have real value. Only drip to a wallet the user intends to keep. |
+| Creating a wallet you'll forget about | Generating a fresh mainnet wallet and losing track of `.radius/wallets/<name>.env` | Mainnet tokens have real value — generate the wallet only when you mean to keep it |
 
 ## Agentic Evaluation Loop
 
