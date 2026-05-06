@@ -1,13 +1,13 @@
 # Legacy x402 CLI Access with curl + cast
 
-Prefer `radius-cli wallet x402 <verb> <url>` for one-shot terminal and agent
-access to x402-gated endpoints. This reference is a legacy/specialized fallback
-for environments that cannot use `radius-cli` and already have a funded Foundry
-keystore account.
+`radius-cli wallet x402 <verb> <url>` is the canonical path for one-shot
+terminal and agent access to x402-gated endpoints. Use this `cast` flow only as
+a fallback in environments that cannot use `radius-cli` and already have a
+funded Foundry keystore account.
 
-For fresh agent-created wallets, do not use this cast flow. Use
-`RADIUS_HOME=.radius radius-cli wallet x402 ...` as described in
-[x402-client.md](x402-client.md).
+For fresh agent-created wallets, use `RADIUS_HOME=.radius radius-cli wallet x402
+...` as described in [x402-client.md](x402-client.md), not the Foundry
+keystore path below.
 
 Prerequisites:
 - `curl`, `jq`, `base64`, `python3`
