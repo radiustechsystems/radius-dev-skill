@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// Legacy/specialized helper. Prefer `radius-cli wallet x402 <verb> <url>` for
+// agent and terminal consumption of x402-protected endpoints.
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { createRequire } from 'node:module';

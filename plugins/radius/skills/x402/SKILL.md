@@ -6,8 +6,8 @@ description: |
   consume a paid x402 API, sign x402 payment headers, integrate with a facilitator service,
   implement EIP-2612 permit + Permit2 payment signing, build pay-per-call services on Radius
   using SBC token, or set up x402 middleware. Covers both server-side (protect your endpoints
-  with payment gating) and client-side (sign and pay for x402-protected endpoints). Use viem
-  for app code signing, or Foundry cast for one-off CLI payment access.
+  with payment gating) and client-side (sign and pay for x402-protected endpoints). Use
+  `radius-cli wallet x402` for agent/CLI endpoint consumption and viem for app-code signing.
 published: true
 user-invocable: true
 ---
@@ -26,7 +26,7 @@ Use this Skill when the user asks to:
 - Understand the x402 HTTP 402 payment flow
 - Set up x402 middleware for a server
 
-**Not this Skill:** For dApp development on Radius (wagmi, Foundry, event watching), use the **radius-dev** skill. For programmatic on-chain operations from agent code (balance checks, token transfers, contract interaction via wallet libraries), use the **radius-agent-ops** skill. For getting testnet/mainnet tokens, use the **dripping-faucet** skill. For direct on-chain payment patterns (pay-per-visit paywalls, streaming payments) that don't use x402 facilitators, see radius-dev's [micropayments.md](../radius-dev/references/micropayments.md). For platform deployment, hosting, domains, or infrastructure operations, use the relevant deployment skill (for example Cloudflare, Wrangler, Railway) after the x402 endpoint behavior is implemented.
+**Not this Skill:** For dApp development on Radius (wagmi, Foundry, event watching), use the **radius-dev** skill. For getting testnet/mainnet tokens, use the **dripping-faucet** skill. For direct on-chain payment patterns (pay-per-visit paywalls, streaming payments) that don't use x402 facilitators, see radius-dev's [micropayments.md](../radius-dev/references/micropayments.md). For platform deployment, hosting, domains, or infrastructure operations, use the relevant deployment skill (for example Cloudflare, Wrangler, Railway) after the x402 endpoint behavior is implemented.
 
 ## Protocol overview
 
@@ -181,9 +181,9 @@ Radius-operated facilitators support EIP-2612 gas sponsoring for first-time wall
 
 Follow the shared Radius wallet convention from the **radius-dev** skill:
 
-- Fresh one-shot agent demos should use the radius-dev wallet bootstrap helper and the viem client path from [x402-client.md](references/x402-client.md).
-- One-off terminal access with [x402-cli-cast.md](references/x402-cli-cast.md) is for pre-existing Foundry keystore accounts via `CAST_ACCOUNT=<name>` and `cast wallet sign --account "$CAST_ACCOUNT"`.
-- App-code clients may load `PRIVATE_KEY` from the environment for viem signing.
+- Fresh one-shot agent demos and terminal access should use `radius-cli wallet x402`.
+- App-code clients may load key material from environment variables or a secrets manager for viem signing.
+- [x402-cli-cast.md](references/x402-cli-cast.md) and `scripts/x402-pay.mjs` are legacy/specialized references for environments that cannot use `radius-cli`.
 - Never request, log, hardcode, or pass raw private keys as CLI arguments such as `--private-key`.
 
 ## Operating procedure
@@ -201,21 +201,45 @@ Follow the shared Radius wallet convention from the **radius-dev** skill:
 
 ### B. "I want to consume a paid x402 API" (client-side)
 
-**Fast path for an agent-bootstrapped wallet:** after `radius-wallet-bootstrap.mjs` writes `.radius/wallets/<name>.env` (testnet or mainnet) and the dripping-faucet skill funds it, paying any x402 endpoint is one command:
+**Default agent/CLI path:** use `radius-cli wallet x402 <verb> <url>` from a
+wallet scope controlled by `RADIUS_HOME`.
 
 ```bash
-set -a; . .radius/wallets/<name>.env; set +a
-node ${CLAUDE_PLUGIN_ROOT}/skills/x402/scripts/x402-pay.mjs <url> [--max-amount <raw>]
+RADIUS_HOME=.radius RADIUS_NETWORK=testnet \
+  radius-cli wallet x402 get https://example.com/paid \
+  --x402-threshold 0.001 \
+  --json \
+  -y
 ```
 
-The helper handles the full flow below (parse 402 → pick the `accepts` entry matching the wallet's network → sign EIP-2612 + Permit2 → retry with `PAYMENT-SIGNATURE`) and prints structured `key=value` output. Requires `viem >= 2.0.0` installed in the cwd. Use the manual flow below when embedding signing into app code or when you need browser-wallet popups.
+`radius-cli` handles the full flow (request endpoint, parse 402
+`PAYMENT-REQUIRED`, select a compatible `accepts` entry, sign the required x402
+payload, retry with payment headers, and print the paid response). It is the
+preferred path for agents consuming x402 endpoints.
 
-> **Mainnet:** always pass `--max-amount <raw>` (raw 6-decimal SBC units; e.g. `10000` = 0.01 SBC). Mainnet payments are real money and the helper will sign whatever amount the endpoint requests.
+`--x402-threshold` is expressed in display units such as SBC, not raw 6-decimal
+integer units. Always set it for non-interactive agent runs; the command should
+refuse to pay if the endpoint asks for more than the threshold. Use `-y` only
+after the threshold and target URL are explicit.
+
+Common request forms:
+
+```bash
+radius-cli wallet x402 post https://example.com/paid \
+  --x402-threshold 0.01 \
+  -H "Content-Type: application/json" \
+  -d '{"query":"radius"}' \
+  --json \
+  -y
+```
+
+Set `RADIUS_RPC_URL` or `RADIUS_SBC_ADDRESS` when you need to override the
+network defaults for a local or custom environment.
 
 1. **Discover services** — query `/discovery/resources` endpoints to find available x402 services programmatically. See [x402-client.md § Discovering services](references/x402-client.md#discovering-x402-services) for code and known endpoints. Any HTTP endpoint that returns 402 with a `PAYMENT-REQUIRED` header is also an x402 service — the 402 response itself is a discovery mechanism.
 2. **Request the endpoint** — receive 402 with payment requirements in the `PAYMENT-REQUIRED` header
 3. **Parse the requirements** — base64-decode `PAYMENT-REQUIRED` with `parsePaymentRequired()` from [x402-client.md](references/x402-client.md) and select the `accepts[i]` whose `network` matches your wallet's chain (do not blindly pick `accepts[0]`)
-4. **Sign both permits** — for one-shot agent runs use `scripts/x402-pay.mjs` (above); for app code, use `signX402Payment()` from [x402-client.md](references/x402-client.md); for pre-existing Foundry keystore accounts, use [x402-cli-cast.md](references/x402-cli-cast.md)
+4. **Sign and pay** — for one-shot agent runs use `radius-cli wallet x402`; for app code, use `signX402Payment()` from [x402-client.md](references/x402-client.md)
 5. **Retry with payment** — set the `PAYMENT-SIGNATURE` header to the base64-encoded payload
 6. **Receive data** — 200 response with the paid content
 
@@ -225,9 +249,11 @@ The helper handles the full flow below (parse 402 → pick the `accepts` entry m
 |----------|----------|---------|-------------|
 | `PAYMENT_ADDRESS` | Server | Server | Wallet address that receives SBC payments |
 | `FACILITATOR_API_KEY` | No | Server | Optional API key for the facilitator |
-| `PRIVATE_KEY` | Client scripts | Client | Environment-provided private key for viem signing; never inline or log this |
-| `RADIUS_PRIVATE_KEY` | Client scripts | Client | Alias written by the wallet bootstrap helper for Radius app-code examples |
-| `CAST_ACCOUNT` | CLI examples | Client | Pre-existing Foundry keystore account name for `cast wallet sign --account`; not used for fresh helper-created env wallets |
+| `RADIUS_HOME` | Client CLI | Client | Project/agent-scoped `radius-cli` wallet state directory |
+| `RADIUS_NETWORK` | Client CLI | Client | Radius network for `radius-cli` operations, usually `testnet` or `mainnet` |
+| `RADIUS_RPC_URL` | Client CLI/app code | Client | Optional RPC override for custom environments |
+| `RADIUS_SBC_ADDRESS` | Client CLI/app code | Client | Optional SBC token override; defaults to Radius SBC |
+| `PRIVATE_KEY` | Client app code | Client | Environment-provided private key for viem signing; never inline or log this |
 
 ## Gotchas
 
@@ -270,11 +296,11 @@ The helper handles the full flow below (parse 402 → pick the `accepts` entry m
 **Local references:**
 - Server-side implementation: [x402-server.md](references/x402-server.md)
 - App client signing with viem/browser wallets: [x402-client.md](references/x402-client.md)
-- One-off CLI payment access with curl + cast: [x402-cli-cast.md](references/x402-cli-cast.md)
+- Legacy one-off CLI payment access with curl + cast: [x402-cli-cast.md](references/x402-cli-cast.md)
 - Facilitator API reference: [facilitator-api.md](references/facilitator-api.md)
 
-**Scripts:**
-- One-shot env-bootstrapped payment helper: `scripts/x402-pay.mjs` (used by §B fast path above)
+**Legacy/specialized scripts:**
+- Env-bootstrapped viem payment helper: `scripts/x402-pay.mjs` (prefer `radius-cli wallet x402` for agent CLI use)
 
 **Cross-references to other skills:**
 - Chain definitions, RPC, wallet conventions, general Radius dev: **radius-dev** skill
