@@ -75,19 +75,42 @@ Use this Skill when the user asks for:
 
 ## Wallet conventions
 
-Use the wallet shape that matches the workflow:
+Use `radius-cli` as the canonical local agent wallet and execution surface.
+Other Radius skills should follow this convention instead of defining one-off
+wallet handling.
 
-- **Existing CLI / Foundry / cast wallets:** use named Foundry keystore accounts. Create them with `cast wallet import <name> --interactive`, then sign or send with `--account <name>`. Expose `CAST_ACCOUNT=<name>` and derive addresses with `cast wallet address --account "$CAST_ACCOUNT"` when possible.
-- **Agent-created wallets:** use the local bootstrap helper, then consume the generated env file from viem/app-code flows:
+- **Local agent wallets and terminal workflows:** use `radius-cli` with an
+  explicit `RADIUS_HOME` so wallet state is scoped to the current project or
+  agent. Use it for wallet address discovery, balances, sends, message signing,
+  transaction reads, receipt/status checks, and x402 endpoint consumption.
   ```bash
-  node plugins/radius/skills/radius-dev/scripts/radius-wallet-bootstrap.mjs --name radius-demo --network testnet
-  set -a; . .radius/wallets/radius-demo.env; set +a
+  export RADIUS_HOME="${RADIUS_HOME:-.radius}"
+  export RADIUS_NETWORK="${RADIUS_NETWORK:-testnet}"
+  radius-cli wallet address
   ```
-  Pass `--network mainnet` for a mainnet wallet (the helper writes the matching chain ID and RPC into the env file). The helper writes `.radius/wallets/<name>.env` with `0600` permissions, creates `.radius/.gitignore`, and prints only non-secret values.
-- **App code / viem examples:** private keys may come from environment variables such as `PRIVATE_KEY` or `RADIUS_PRIVATE_KEY`, loaded from `.env`, `.radius/wallets/<name>.env`, or a secrets manager. Never inline or log them.
-- **Never pass raw keys as CLI arguments.** Do not use `--private-key` in commands; it can leak through shell history and process listings.
-
-Other Radius skills should follow this convention instead of defining one-off wallet handling.
+- **x402 endpoint consumption from agents:** use `radius-cli wallet x402 <verb>
+  <url>` with `--x402-threshold <amount>` and `-y` for intentional
+  non-interactive payment.
+  ```bash
+  RADIUS_HOME=.radius RADIUS_NETWORK=testnet \
+    radius-cli wallet x402 get https://example.com/paid \
+    --x402-threshold 0.001 \
+    --json \
+    -y
+  ```
+  `--x402-threshold` is a display-unit limit such as SBC, not a raw 6-decimal
+  integer. Do not omit it in automated agent flows.
+- **App code and embedded integrations:** use viem directly
+  (`createPublicClient`, `createWalletClient`, `privateKeyToAccount`) and load
+  keys from environment variables or a secrets manager. Never inline or log
+  private keys.
+- **Smart contract development and advanced EVM workflows:** use Foundry
+  (`forge`/`cast`) for contract builds, tests, deployment scripts, low-level
+  contract reads, and debugging. Foundry is no longer the default agent wallet
+  surface.
+- **Raw keys:** never use `--private-key` in agent-visible commands unless the
+  operator explicitly accepts that debugging risk for a local session. CLI
+  arguments can leak through shell history and process listings.
 
 ## Canonical chain definitions
 
@@ -179,6 +202,7 @@ Standard ERC-20 interactions, storage operations, and events work unchanged.
 - UI: wagmi + Radius chain via `defineChain` + React hooks
 - Scripts/backends: plain viem (`createPublicClient`, `createWalletClient`, `defineChain`)
 - Smart contracts: Foundry (`forge` / `cast`) + OpenZeppelin
+- Agent wallet and terminal execution: `radius-cli`
 - Micropayments: viem + server-side verification + wallet integration
 - x402: Middleware pattern with Radius facilitator for settlement (Permit2 or EIP-2612) — see the **x402** skill for full implementation details
 
@@ -190,7 +214,7 @@ Always be explicit about:
 - Sub-second finality (no need to wait for multiple confirmations)
 - SBC uses 6 decimals (use `parseUnits(amount, 6)`, NOT `parseEther`)
 - RUSD (native token) uses 18 decimals (use `parseEther` for native transfers)
-- The wallet convention above: Foundry keystore accounts for existing CLI wallets, bootstrap-helper env wallets for fresh testnet agent flows, environment-backed private keys for app code, and no raw keys in CLI arguments
+- The wallet convention above: `radius-cli`/`RADIUS_HOME` for local agent wallets and terminal execution, viem for app code, Foundry for smart-contract workflows, and no raw keys in agent-visible CLI arguments
 - Gas price from `eth_gasPrice` RPC (viem handles this automatically via the chain definition)
 
 ### 4. Watch for production gotchas
@@ -204,7 +228,7 @@ Before shipping, review [gotchas.md](references/gotchas.md) for:
 ### 5. Test
 - Smart contracts: `forge test` locally, then deploy to Radius Testnet
 - TypeScript scripts: Run against testnet RPC with funded test accounts
-- Fresh agent testnet wallets: use `scripts/radius-wallet-bootstrap.mjs`, then source `.radius/wallets/<name>.env`
+- Fresh agent wallets: use `radius-cli` with a project-scoped `RADIUS_HOME` and the appropriate `RADIUS_NETWORK`
 - Get testnet tokens: use the **dripping-faucet** skill for programmatic access, or the [web faucet](https://testnet.radiustech.xyz/wallet) manually
 - Verify deployments: `cast code <address> --rpc-url https://rpc.testnet.radiustech.xyz`
 
@@ -239,5 +263,5 @@ When you implement changes, provide:
 - Micropayment patterns: [micropayments.md](references/micropayments.md)
 - Production gotchas: [gotchas.md](references/gotchas.md)
 - Security checklist: [security.md](references/security.md)
-- Agent wallet bootstrap helper: [scripts/radius-wallet-bootstrap.mjs](scripts/radius-wallet-bootstrap.mjs)
+- Legacy env wallet bootstrap helper: [scripts/radius-wallet-bootstrap.mjs](scripts/radius-wallet-bootstrap.mjs) (prefer `radius-cli` for agent wallets)
 - Curated reference links: [resources.md](references/resources.md)

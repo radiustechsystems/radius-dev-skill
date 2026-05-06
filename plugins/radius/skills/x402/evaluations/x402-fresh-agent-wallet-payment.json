@@ -2,24 +2,23 @@
     "name": "x402 Payment with Fresh Agent Testnet Wallet",
     "skills": ["radius-dev", "dripping-faucet", "x402"],
     "query": "Create a fresh Radius testnet wallet, fund it from the faucet, then call this x402 endpoint and pay for the response. Do it as an automated agent demo.",
-    "context": "The user wants a one-shot automated demo using a new testnet wallet. The agent must avoid interactive Foundry keystore prompts and raw private keys in CLI arguments. The x402 endpoint supports Radius testnet, PAYMENT-REQUIRED, EIP-2612 gas sponsoring, and Permit2.",
+    "context": "The user wants a one-shot automated demo using a new testnet wallet. The agent must avoid interactive Foundry keystore prompts and raw private keys in CLI arguments. The x402 endpoint supports Radius testnet and PAYMENT-REQUIRED.",
     "expected_behavior": [
-        "Bootstraps a fresh testnet wallet with radius-wallet-bootstrap.mjs",
-        "Loads .radius/wallets/<name>.env and uses OWNER as the faucet address",
-        "Funds the wallet with the dripping-faucet viem/app-code path and verifies SBC balance on Radius testnet",
-        "Consumes the x402 endpoint with the viem client path from x402-client.md, not the cast CLI path",
-        "Reads PAYMENT-REQUIRED, selects accepts[0], reads the EIP-2612 nonce, signs EIP-2612 and Permit2 typed data with the env-backed viem account, sends PAYMENT-SIGNATURE, and reports the response",
-        "Does not use CAST_ACCOUNT, cast wallet sign, or Foundry keystore prompts for the fresh helper-created wallet"
+        "Creates or selects a fresh testnet wallet with radius-cli using RADIUS_HOME=.radius and RADIUS_NETWORK=testnet",
+        "Uses radius-cli wallet address as the faucet address",
+        "Funds the wallet with the dripping-faucet flow using radius-cli signing if a signature is required and verifies SBC balance on Radius testnet",
+        "Consumes the x402 endpoint with radius-cli wallet x402 <verb> <url>",
+        "Includes --x402-threshold in display units, --json, and -y for the paid request",
+        "Does not use CAST_ACCOUNT, cast wallet sign, manual viem payment signing, or Foundry keystore prompts for the fresh radius-cli wallet"
     ],
     "success_criteria": [
         "Uses Radius testnet chain ID 72344 and RPC https://rpc.testnet.radiustech.xyz",
         "SBC balance is checked on-chain after faucet funding",
-        "Amount handling uses 6-decimal SBC raw units",
-        "EIP-2612 domain uses name Stable Coin and version 1",
-        "Permit2 spender is the x402 Proxy 0x402085c248EeA27D92E8b30b2C58ed07f9E20001",
-        "EIP-2612 spender is the Permit2 contract 0x000000000022D473030F116dDEE9F6B43aC78BA3",
+        "x402 command shape is radius-cli wallet x402 <verb> <url>",
+        "x402 threshold uses display units and is present before -y",
         "No raw private key is printed, logged, hardcoded, or passed as a CLI argument",
         "No command uses --private-key",
+        "No command uses cast wallet sign or manual EIP-712 JSON generation",
         "The final paid request returns or reports the service response"
     ]
 }

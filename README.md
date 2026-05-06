@@ -1,6 +1,47 @@
 # Radius Skills Marketplace
 
-A Claude Code plugin marketplace from Radius providing skills to enhance AI-assisted development workflows.
+Portable Radius skills for AI-assisted development workflows.
+
+This repository owns framework-neutral guidance: Radius network configuration,
+development conventions, faucet usage, x402 integration guidance, and evaluation
+fixtures for those skills. It does not ship a shared wallet runtime, deterministic
+wallet MCP server, or framework-specific execution plugin.
+
+## Boundaries
+
+- **This skills repo**: portable Radius agent guidance and examples that can be
+  installed by agent frameworks.
+- **`radius-cli`**: the canonical deterministic wallet, transaction, read,
+  signing, and x402 execution surface for local agents and terminal workflows.
+- **Hermes, OpenClaw, Codex, and other frameworks**: thin wrappers should load
+  these skills for guidance and call `radius-cli` for wallet and execution
+  operations instead of reimplementing wallet state.
+
+For consuming x402-protected endpoints from an agent shell, prefer
+`radius-cli wallet x402 <verb> <url>` with an explicit `--x402-threshold`
+display-unit limit. Example:
+
+```bash
+RADIUS_HOME=.radius RADIUS_NETWORK=testnet \
+  radius-cli wallet x402 get https://example.com/paid \
+  --x402-threshold 0.001 \
+  --json \
+  -y
+```
+
+`--x402-threshold` is expressed in display units such as SBC, not raw 6-decimal
+integer units. Use it for non-interactive agent runs so the command refuses
+unexpectedly expensive requests.
+
+## Agent Framework Usage
+
+- **Hermes**: use template-provided tools that wrap `radius-cli`; install or
+  sync this repo's skills for Radius-specific guidance.
+- **Codex**: install the skills for guidance; use shell access to invoke
+  `radius-cli` directly, or a future thin MCP wrapper that delegates to
+  `radius-cli`.
+- **OpenClaw**: load skills separately from native plugins; native plugins should
+  wrap `radius-cli` for wallet, signing, transaction, and x402 operations.
 
 ## Installation
 
