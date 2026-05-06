@@ -205,7 +205,19 @@ const balance = await publicClient.readContract({
 console.log('SBC balance:', formatUnits(balance, SBC_DECIMALS));
 ```
 
-### cast (Foundry)
+### radius-cli
+
+For agent and terminal checks, prefer `radius-cli`:
+
+```bash
+RADIUS_HOME=.radius RADIUS_NETWORK=testnet \
+  radius-cli wallet balance --json
+```
+
+Set `RADIUS_RPC_URL` or `RADIUS_SBC_ADDRESS` only when overriding the standard
+Radius network defaults.
+
+### cast (Foundry, contract-debug fallback)
 
 ```bash
 cast call 0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb \
