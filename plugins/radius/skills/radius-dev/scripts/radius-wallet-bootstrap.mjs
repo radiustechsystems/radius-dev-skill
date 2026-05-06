@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// Legacy helper retained for older env-backed viem examples. Prefer
+// `radius-cli` with a scoped `RADIUS_HOME` for agent wallets.
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync, chmodSync } from 'node:fs';
 import { join, resolve } from 'node:path';
