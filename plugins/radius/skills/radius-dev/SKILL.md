@@ -159,7 +159,7 @@ Always keep these in mind when writing code for Radius:
 | Reconstructed blocks | N/A | Contain all txs executed within the same ms |
 | Block hash | Hash of block header | Equals block number (timestamp-based) |
 | `transactionIndex` | Position in block | Can be `0` for multiple txs in same ms |
-| `blockhash()` | Cryptographic hash | Timestamp-derived, predictable (NOT random) |
+| On-chain randomness (`blockhash`, `prevrandao`, `difficulty`) | `prevrandao` carries RANDAO mix | No safe source: `prevrandao`/`difficulty` = `0`, `blockhash` predictable, no EIP-2935 — use off-chain entropy |
 | `eth_getLogs` | Address filter optional | Address filter **required** (error `-33014`) |
 | `eth_sendRawTransactionSync` | N/A | EIP-7966: sync tx+receipt (~50% less latency) |
 | `rad_getBalanceRaw` | N/A | Raw RUSD only (excludes convertible SBC) |
