@@ -412,6 +412,15 @@ Best practice: read chain ID dynamically from the connected provider rather than
 
 ---
 
+## 22. Some standard read methods are unsupported (`eth_getProof`, `eth_getBlockReceipts`)
+
+Two standard Ethereum read methods return error `-33000` on Radius:
+
+- **`eth_getProof`** — Radius stores state across a parallelized, sharded infrastructure with no single global Merkle-Patricia trie, so it does not issue state proofs; its instant, deterministic finality removes the need for them. Read state directly with `eth_getBalance`, `eth_getCode`, and `eth_getStorageAt`.
+- **`eth_getBlockReceipts`** — Radius executes transactions individually, not in blocks (the block number is wall-clock time for tooling compatibility), so "every receipt in a block" is not a meaningful unit. To fetch a block's receipts, enumerate its transactions with `eth_getBlockByNumber` (full) and call `eth_getTransactionReceipt` for each; for event indexing of known contracts, use address-filtered `eth_getLogs` (see #18).
+
+---
+
 ## Quick reference: environment variables
 
 | Variable | Required | Description |
