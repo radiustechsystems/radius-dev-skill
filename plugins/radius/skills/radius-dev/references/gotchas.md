@@ -375,7 +375,7 @@ Radius has **no safe source of on-chain randomness**. Every block-derived source
 | `block.prevrandao` | Constant `0` |
 | `block.difficulty` | Constant `0` (same opcode as `prevrandao`) |
 | `blockhash(block.number - 1)` | Deterministic, non-cryptographic, no entropy — computable by an attacker in the same transaction |
-| `blockhash` for older blocks | Non-zero only within ~256 of the current block number — and since block numbers are ms timestamps, that's only a few hundred ms of history (versus ~51 min on Ethereum). EIP-2935's history contract isn't deployed, so OpenZeppelin's `Blockhash` utility can't extend past that native window (predictable value within it, `0` for older blocks). |
+| `blockhash` for older blocks | Non-zero only within ~256 of the current block number — and since block numbers are ms timestamps, that's only a few hundred ms of history (versus ~51 min on Ethereum). EIP-2935's history contract isn't deployed, so OpenZeppelin's `Blockhash` utility can't extend past that native window (returns the predictable native `blockhash` value within it, `0` for older blocks). |
 
 Any contract deriving randomness from these is **exploitable** — an attacker predicts the outcome and acts on it atomically (verified live: an attacker contract computed a "lottery" winner in the same transaction, every time).
 
