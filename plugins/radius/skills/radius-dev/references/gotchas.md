@@ -176,6 +176,38 @@ Also add a ~200ms delay between consecutive transactions. Without it, the RPC so
 
 ---
 
+## 7b. No replace-by-fee (RBF); a returned hash means "queued," not "will execute"
+
+Radius admits transactions through a bounded pseudo-mempool that queues future-nonce transactions until the gap fills. Two behaviors differ from Ethereum's mempool and silently break ported code.
+
+**No replace-by-fee (RBF).** On Ethereum, resubmitting at an already-occupied nonce with higher gas replaces the pending tx — the basis for cancel / fee-bump / stuck-tx recovery. On Radius, RBF is a no-op: the pseudo-mempool queues *future* nonces but does not replace a tx at an occupied nonce. A second tx at an occupied nonce is **rejected** (`-33009 Exec Failed`), not swapped in — even at 2× gas (verified live).
+
+```typescript
+// WRONG on Radius — "unstick" a tx by resubmitting the same nonce at higher gas.
+// The replacement is rejected; nothing gets unstuck, and the caller may wait forever.
+await walletClient.sendTransaction({ ...params, nonce: stuckNonce, gasPrice: gasPrice * 2n });
+```
+
+There is nothing to unstick: gas price is fixed (no underpriced txs) and finality is instant, so a validly submitted tx executes immediately or is rejected at submission — it never sits pending as a fee-bumpable tx. **Remove cancel / fee-bump / stuck-tx recovery when porting; rely on instant finality.**
+
+**A returned tx hash means "queued," not "will execute."** A hash from `eth_sendRawTransaction` for a **future-nonce** tx (submitted while an earlier nonce is unfilled) means only that it was accepted into the queue. It executes when the gap fills — the hash is **not** a commitment that it will mine. If the gap is never filled it never executes (in testing, a queued future-nonce tx persisted >35s and executed only on gap-fill).
+
+```typescript
+// WRONG — treating the returned hash as "submitted == will land"
+const hash = await walletClient.sendTransaction(params);
+markPaymentSuccessful(hash); // may be parked behind a nonce gap that never fills
+
+// CORRECT — poll for the receipt; submit in nonce order so gaps fill
+const hash = await walletClient.sendTransaction(params);
+const receipt = await publicClient.waitForTransactionReceipt({ hash });
+if (receipt.status !== 'success') throw new Error('tx reverted');
+// Or use eth_sendRawTransactionSync (EIP-7966) to get the receipt directly.
+```
+
+Send in nonce order and keep each account's in-flight txs low (see gotcha #7) so queued future-nonce txs can execute.
+
+---
+
 ## 8. EIP-2612 permit signing — domain must match exactly
 
 The Stable Coin token uses EIP-2612 permits. The EIP-712 domain must match what the token contract was deployed with:
