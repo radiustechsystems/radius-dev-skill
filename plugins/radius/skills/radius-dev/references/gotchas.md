@@ -178,13 +178,13 @@ Also add a ~200ms delay between consecutive transactions. Without it, the RPC so
 
 ## 7b. No replace-by-fee (RBF); a returned hash means "queued," not "will execute"
 
-Radius admits transactions through a bounded pseudo-mempool that queues future-nonce transactions until the gap fills. Two behaviors differ from Ethereum's mempool and silently break ported code.
+Radius admits transactions through a bounded pseudo-mempool that queues future-nonce transactions until the gap fills. Two behaviors differ from Ethereum's mempool and affect ported code.
 
 **No replace-by-fee (RBF).** On Ethereum, resubmitting at an already-occupied nonce with higher gas replaces the pending tx — the basis for cancel / fee-bump / stuck-tx recovery. On Radius, RBF is a no-op: the pseudo-mempool queues *future* nonces but does not replace a tx at an occupied nonce. A second tx at an occupied nonce is **rejected** (`-33009 Exec Failed`), not swapped in — even at 2× gas (verified live).
 
 ```typescript
 // WRONG on Radius — "unstick" a tx by resubmitting the same nonce at higher gas.
-// The replacement is rejected; nothing gets unstuck, and the caller may wait forever.
+// The replacement is rejected; nothing gets unstuck, so recovery logic that waits for it never completes.
 await walletClient.sendTransaction({ ...params, nonce: stuckNonce, gasPrice: gasPrice * 2n });
 ```
 
