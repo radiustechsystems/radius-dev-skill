@@ -20,7 +20,7 @@ Use this Skill when the user asks for:
 - Radius network configuration, RPC endpoints, contract addresses
 - Production gotchas (wallet compatibility, nonce management, decimal handling)
 - Hardhat or ethers.js integration with Radius
-- JSON-RPC differences, the broadly-recognized EIP-7966 sync method (`eth_sendRawTransactionSync`), and Radius-specific extensions (`rad_getBalanceRaw`)
+- JSON-RPC differences, the EIP-7966 sync method (`eth_sendRawTransactionSync`), and Radius-specific extensions (`rad_getBalanceRaw`)
 
 ## Default stack decisions (opinionated)
 
@@ -161,7 +161,7 @@ Always keep these in mind when writing code for Radius:
 | `transactionIndex` | Position in block | Can be `0` for multiple txs in same ms |
 | `blockhash()` | Cryptographic hash | Timestamp-derived, predictable (NOT random) |
 | `eth_getLogs` | Address filter optional | Address filter **required** (error `-33014`) |
-| `eth_sendRawTransactionSync` | EIP-7966 method, broadly recognized (also on reth/others) | Same method; the Radius edge is the receipt is **instant + final** (~100ms, no reorg) vs an L2 inclusion receipt (~460ms, reorg-able) |
+| `eth_sendRawTransactionSync` | EIP-7966 sync tx submission (returns the receipt directly) | On Radius the receipt is **instant + final** (~100ms, no reorg) vs an L2 inclusion receipt (~460ms, reorg-able) |
 | `rad_getBalanceRaw` | N/A | Raw RUSD only (excludes convertible SBC) |
 | State queries | Historical state by block tag | `latest`/`pending`/`safe`/`finalized` return current state; historical block numbers rejected (error `-32000`) |
 | SBC decimals | — | 6 decimals (NOT 18) |
