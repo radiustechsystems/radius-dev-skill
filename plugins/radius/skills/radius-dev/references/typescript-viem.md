@@ -511,6 +511,8 @@ async function transfer(
 
 Radius supports `eth_sendRawTransactionSync` (EIP-7966), which submits a transaction and waits for the receipt in a single RPC call — roughly 50% less latency than the standard `sendTransaction` + `waitForTransactionReceipt` polling pattern.
 
+On Radius, what makes `eth_sendRawTransactionSync` valuable is what the returned receipt means: because Radius has instant finality, the sync receipt is fast **and final** (~100ms, no reorg). On a typical L2 the equivalent sync receipt reflects only inclusion (~460ms in our testing) and can reorg until it settles on L1.
+
 ```typescript
 import { serializeTransaction, signTransaction } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';

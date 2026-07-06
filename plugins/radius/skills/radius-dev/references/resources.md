@@ -80,7 +80,7 @@
 - [EIP-2930](https://eips.ethereum.org/EIPS/eip-2930) — Access lists
 - [EIP-4844](https://eips.ethereum.org/EIPS/eip-4844) — Blob transactions
 - [EIP-7702](https://eips.ethereum.org/EIPS/eip-7702) — Set EOA account code
-- [EIP-7966](https://eips.ethereum.org/EIPS/eip-7966) — `eth_sendRawTransactionSync` (synchronous tx submission; supported on Radius)
+- [EIP-7966](https://eips.ethereum.org/EIPS/eip-7966) — `eth_sendRawTransactionSync` (synchronous tx submission; on Radius the sync receipt is instant + final, no reorg)
 
 ## Wallet Integration
 
