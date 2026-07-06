@@ -176,11 +176,11 @@ Also add a ~200ms delay between consecutive transactions. Without it, the RPC so
 
 ---
 
-## 7b. No replace-by-fee (RBF); a returned hash means "queued," not "will execute"
+## 7b. Replace-by-fee is queued-txs-only; a returned hash means "queued," not "will execute"
 
 Radius admits transactions through a bounded pseudo-mempool that queues future-nonce transactions until the gap fills. Two behaviors differ from Ethereum's mempool and affect ported code.
 
-**No replace-by-fee (RBF).** On Ethereum, resubmitting at an already-occupied nonce with higher gas replaces the pending tx — the basis for cancel / fee-bump / stuck-tx recovery. On Radius, RBF is a no-op: the pseudo-mempool queues *future* nonces but does not replace a tx at an occupied nonce. A second tx at an occupied nonce is **rejected** (`-33009 Exec Failed`), not swapped in — even at 2× gas (verified live).
+**Replace-by-fee only applies to still-queued txs.** On Ethereum, resubmitting at an already-occupied nonce with higher gas replaces the pending tx — the basis for cancel / fee-bump / stuck-tx recovery. On Radius that occupied-nonce case is **rejected** (`-33009 Exec Failed`) even at 2× gas: with instant finality the tx has already executed, so there is nothing to replace (verified live, 5/5). RBF *does* work for a tx still **queued** behind an unfilled future nonce — resubmitting at that nonce with a **higher** gas price swaps it in (same or lower gas is rejected; verified live). Exactly one tx per nonce executes. The Ethereum "fee-bump a stuck tx at the current nonce" pattern has no equivalent — current-nonce txs never sit pending.
 
 ```typescript
 // WRONG on Radius — "unstick" a tx by resubmitting the same nonce at higher gas.
