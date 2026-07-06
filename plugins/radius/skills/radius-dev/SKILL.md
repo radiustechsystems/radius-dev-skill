@@ -20,7 +20,7 @@ Use this Skill when the user asks for:
 - Radius network configuration, RPC endpoints, contract addresses
 - Production gotchas (wallet compatibility, nonce management, decimal handling)
 - Hardhat or ethers.js integration with Radius
-- JSON-RPC differences and Radius-specific extensions (EIP-7966, `rad_getBalanceRaw`)
+- JSON-RPC differences, the EIP-7966 sync method (`eth_sendRawTransactionSync`), and Radius-specific extensions (`rad_getBalanceRaw`)
 
 ## Default stack decisions (opinionated)
 
@@ -163,7 +163,7 @@ Always keep these in mind when writing code for Radius:
 | `eth_getLogs` | Address filter optional | Address filter **required** (error `-33014`) |
 | `eth_getProof` | Merkle state proofs | Unsupported (error `-33000`) — instant-final state model, no proofs needed |
 | `eth_getBlockReceipts` | All receipts in a block | Unsupported (error `-33000`) — txs executed individually, not in blocks |
-| `eth_sendRawTransactionSync` | N/A | EIP-7966: sync tx+receipt (~50% less latency) |
+| `eth_sendRawTransactionSync` | EIP-7966 sync tx submission (returns the receipt directly) | On Radius the receipt is **instant + final** (~100ms, no reorg) vs an L2 inclusion receipt (~460ms, reorg-able) |
 | `rad_getBalanceRaw` | N/A | Raw RUSD only (excludes convertible SBC) |
 | State queries | Historical state by block tag | `latest`/`pending`/`safe`/`finalized` return current state; historical block numbers rejected (error `-32000`) |
 | SBC decimals | — | 6 decimals (NOT 18) |
