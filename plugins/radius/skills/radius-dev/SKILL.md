@@ -220,7 +220,7 @@ Always be explicit about:
 ### 4. Watch for production gotchas
 Before shipping, review [gotchas.md](references/gotchas.md) for:
 - Wallet compatibility (MetaMask is the only wallet that reliably adds Radius)
-- Nonce collision handling under concurrent load
+- Nonce management for unmanaged concurrent sends from one wallet (contiguous-nonce batches like `forge script --broadcast` need no special handling)
 - Block number is a timestamp (use BigInt, never parseInt)
 - Transaction receipts can be null even for confirmed transactions
 - EIP-2612 permit domain must match exactly: `{ name: "Stable Coin", version: "1" }`
