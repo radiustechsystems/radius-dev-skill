@@ -327,7 +327,7 @@ const recipients = [
   '0x90F79bf6EB2c4f870365E785982E1f101E93b906',
 ] as const;
 
-// Send sequentially (safer — avoids nonce collisions)
+// Send sequentially (simplest — no nonce coordination needed)
 const hashes: `0x${string}`[] = [];
 for (const to of recipients) {
   const hash = await walletClient.sendTransaction({
@@ -343,7 +343,7 @@ const receipts = await Promise.all(
 );
 ```
 
-> **Gotcha:** If you send concurrent transactions from the same wallet, you will hit nonce collisions. Radius enforces strict sequential nonces. Always send sequentially from a single wallet, or use a nonce-aware queue. See [gotchas.md](gotchas.md#7-nonce-collisions-under-concurrent-load).
+> **Gotcha:** *Unmanaged* concurrent sends from the same wallet can collide on the nonce — as on any EVM chain, parallel calls may each read the same pending nonce before the earlier tx is accounted for. Let viem manage nonces (its default), serialize through a queue, or pre-assign contiguous nonces. Pre-signed contiguous-nonce batches (e.g. `forge script --broadcast`) land fine — you do **not** need to send one at a time or add delays. See [gotchas.md](gotchas.md#7-nonce-management-for-concurrent-sends-from-one-wallet).
 
 For batching **reads**, use Multicall3 (deployed at `0xcA11bde05977b3631167028862bE2a173976CA11`):
 
@@ -510,6 +510,8 @@ async function transfer(
 ## EIP-7966: Synchronous transactions
 
 Radius supports `eth_sendRawTransactionSync` (EIP-7966), which submits a transaction and waits for the receipt in a single RPC call — roughly 50% less latency than the standard `sendTransaction` + `waitForTransactionReceipt` polling pattern.
+
+On Radius, what makes `eth_sendRawTransactionSync` valuable is what the returned receipt means: because Radius has instant finality, the sync receipt is fast **and final** (~100ms, no reorg). On a typical L2 the equivalent sync receipt reflects only inclusion (~460ms in our testing) and can reorg until it settles on L1.
 
 ```typescript
 import { serializeTransaction, signTransaction } from 'viem';

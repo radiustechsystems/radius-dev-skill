@@ -305,4 +305,4 @@ network defaults for a local or custom environment.
 **Cross-references to other skills:**
 - Chain definitions, RPC, wallet conventions, general Radius dev: **radius-dev** skill
 - Get testnet/mainnet SBC tokens: **dripping-faucet** skill
-- Production gotchas (EIP-2612 domain, v-value, nonce collisions): radius-dev [gotchas.md](../radius-dev/references/gotchas.md)
+- Production gotchas (EIP-2612 domain, v-value, nonce management): radius-dev [gotchas.md](../radius-dev/references/gotchas.md)
