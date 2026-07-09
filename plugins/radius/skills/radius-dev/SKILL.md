@@ -158,7 +158,7 @@ Always keep these in mind when writing code for Radius:
 | `eth_blockNumber` | Monotonic block height | Current timestamp in milliseconds |
 | Reconstructed blocks | N/A | Contain all txs executed within the same ms |
 | Block hash | Hash of block header | Equals block number (timestamp-based) |
-| `transactionIndex` | Position in block | Can be `0` for multiple txs in same ms |
+| `transactionIndex` | Position in block | Receipt always reports `0` — not a unique key; use `transactionHash` |
 | `blockhash()` | Cryptographic hash | Timestamp-derived, predictable (NOT random) |
 | `eth_getLogs` | Address filter optional | Address filter **required** (error `-33014`) |
 | `eth_getProof` | Merkle state proofs | Unsupported (error `-33000`) — instant-final state model, no proofs needed |
