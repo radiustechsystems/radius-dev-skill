@@ -319,19 +319,22 @@ Radius's architecture removes several Ethereum-specific attack vectors:
 | **MEV / sandwich attacks** | Common (public mempool) | Minimal (no global mempool, per-shard consensus) |
 | **Block-level manipulation** | Miners/validators can reorder | Raft consensus eliminates reordering |
 | **Confirmation-based fraud** | Accept 1-confirmation, then reorg | Once confirmed, it is final |
-| **`blockhash()` randomness** | Cryptographic hash | Timestamp-derived (fully predictable) |
+| **On-chain randomness** | `prevrandao` carries RANDAO mix | Not a randomness source: `prevrandao`/`difficulty` = `0`, `blockhash` predictable, no EIP-2935 |
 
-### `blockhash()` is predictable on Radius
+### On-chain randomness is not a secure source
 
-`BLOCKHASH` returns a timestamp-derived value, not a cryptographic hash. Any contract using `blockhash()` as a randomness source is exploitable.
+On-chain values are not a secure source of randomness on any EVM chain, and on Radius this is especially clear-cut: `block.prevrandao` and `block.difficulty` are constant `0` (on Ethereum `prevrandao` returns the beacon RANDAO mix, which varies block to block), `blockhash` is predictable, and EIP-2935's historical-hash contract is not deployed — so `blockhash` is limited to the native ~256-block window (only a few hundred ms of history, since block numbers are ms timestamps; ~51 minutes on Ethereum), and OpenZeppelin's `Blockhash` utility returns `0` for anything older. Because these values are known when the transaction executes, a contract can compute the result in the same transaction — they provide no unpredictability.
 
 ```solidity
-// INSECURE on Radius — value is the previous millisecond timestamp
+// Predictable on Radius — not a source of randomness
 uint256 random = uint256(blockhash(block.number - 1));
 uint256 winner = random % participants.length;
+
+// Also not random — constant 0 on Radius
+uint256 r = block.prevrandao; // and block.difficulty
 ```
 
-Vulnerable patterns: lotteries, raffles, NFT trait generation, commit-reveal schemes, gaming outcomes. Use Chainlink VRF or an off-chain oracle for randomness.
+Affected patterns: lotteries, raffles, randomized NFT mints and trait generation, gaming outcomes, commit-reveal schemes hashing against `blockhash()`. Derive entropy off-chain and bring it on-chain through a trusted path — an external randomness oracle (VRF-style), or a commit-reveal scheme whose revealed value is off-chain entropy. The entropy must be off-chain: a commit-reveal that ultimately hashes an on-chain block value is still fully predictable. (This is distinct from the commit-reveal used for front-running mitigation above, which hides intent rather than sourcing randomness.)
 
 ### Stablecoin fee model considerations
 
@@ -397,7 +400,7 @@ Despite the architectural improvements, all standard smart contract security pra
 - [ ] Emergency pause mechanism available via OpenZeppelin's `Pausable`
 - [ ] Upgrade mechanism is properly access-controlled (if using proxies)
 - [ ] OpenZeppelin Governor/TimelockController/vesting contracts override `CLOCK_MODE()` → `"mode=timestamp"` and `clock()` → `uint48(block.timestamp)` (Radius block numbers are timestamps)
-- [ ] No contract uses `blockhash()` for randomness (predictable on Radius)
+- [ ] No contract derives randomness from on-chain values — `blockhash`, `block.prevrandao`, and `block.difficulty` are all predictable or constant `0` on Radius; use off-chain entropy
 
 ### External Interactions
 - [ ] External contract addresses are validated before calls

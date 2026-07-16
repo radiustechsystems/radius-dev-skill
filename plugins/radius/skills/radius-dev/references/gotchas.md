@@ -368,21 +368,31 @@ For large time ranges, split into consecutive chunks of up to 1,000,000 block un
 
 ---
 
-## 19. `blockhash()` is predictable — NOT random
+## 19. On-chain randomness is not a secure source
 
-On Radius, `BLOCKHASH` returns a timestamp-derived value, not a cryptographic hash. `blockhash(block.number - 1)` returns the previous millisecond timestamp cast to `bytes32`.
+On-chain values are not a secure source of randomness on any EVM chain. On Radius this is especially clear-cut: the block values Ethereum contracts sometimes use for entropy are constant or deterministic here, so they provide no unpredictability at all. Note the contrast so ported contracts are not assumed to behave the same way: `block.prevrandao` returns the beacon RANDAO mix on Ethereum (varies block to block) but is constant `0` on Radius.
 
-Any contract using `blockhash()` as a randomness source is **exploitable** on Radius.
+| Source | Radius behavior |
+|--------|-----------------|
+| `block.prevrandao` | Constant `0` |
+| `block.difficulty` | Constant `0` (same opcode as `prevrandao`) |
+| `blockhash(block.number - 1)` | Deterministic, non-cryptographic, no entropy — computable within the same transaction |
+| `blockhash` for older blocks | Non-zero only within ~256 of the current block number — and since block numbers are ms timestamps, that's only a few hundred ms of history (versus ~51 min on Ethereum). EIP-2935's history contract isn't deployed, so OpenZeppelin's `Blockhash` utility can't extend past that native window (returns the predictable native `blockhash` value within it, `0` for older blocks). |
+
+Because these values are known when the transaction executes, the result is fully determined in advance — a contract can compute it in the same transaction, so it provides no unpredictability (verified live: a contract computed a naive lottery's winner within the same transaction, every time).
 
 ```solidity
-// INSECURE on Radius — value is fully predictable
+// Predictable on Radius — not a source of randomness
 uint256 random = uint256(blockhash(block.number - 1));
 uint256 winner = random % participants.length;
 
-// USE INSTEAD — Chainlink VRF or off-chain oracle for randomness
+// Also not random — constant 0 on Radius
+uint256 r = block.prevrandao; // and block.difficulty
 ```
 
-Vulnerable patterns: lotteries, NFT trait generation, commit-reveal schemes hashing against `blockhash()`, gaming contracts with randomized outcomes.
+Affected patterns: lotteries, raffles, randomized NFT mints and trait generation, gaming outcomes, commit-reveal schemes hashing against `blockhash()`.
+
+**Use instead:** derive entropy off-chain and bring it on-chain through a trusted path — an external randomness oracle (VRF-style), or a commit-reveal scheme whose revealed value is off-chain entropy. What matters is that the entropy is off-chain: a commit-reveal that ultimately hashes an on-chain block value is still fully predictable. Never derive randomness from block values.
 
 ---
 

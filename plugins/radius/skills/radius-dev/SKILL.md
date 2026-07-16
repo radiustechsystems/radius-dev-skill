@@ -159,7 +159,7 @@ Always keep these in mind when writing code for Radius:
 | Reconstructed blocks | N/A | Contain all txs executed within the same ms |
 | Block hash | Hash of block header | Equals block number (timestamp-based) |
 | `transactionIndex` | Position in block | Receipt always reports `0` — not a unique key; use `transactionHash` |
-| `blockhash()` | Cryptographic hash | Timestamp-derived, predictable (NOT random) |
+| On-chain randomness (`blockhash`, `prevrandao`, `difficulty`) | `prevrandao` carries RANDAO mix | Not a randomness source: `prevrandao`/`difficulty` = `0`, `blockhash` predictable, no EIP-2935 — use off-chain entropy |
 | `eth_getLogs` | Address filter optional | Address filter **required** (error `-33014`) |
 | `eth_getProof` | Merkle state proofs | Unsupported (error `-33000`) — instant-final state model, no proofs needed |
 | `eth_getBlockReceipts` | All receipts in a block | Unsupported (error `-33000`) — txs executed individually, not in blocks |
