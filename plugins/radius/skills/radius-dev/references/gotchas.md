@@ -132,11 +132,13 @@ if (!receipt) {
 
 ---
 
-## 7. Nonce collisions under concurrent load
+## 7. Nonce management for concurrent sends from one wallet
 
-When sending multiple transactions from the same wallet (hot wallet, settlement wallet), concurrent sends cause nonce errors. Radius enforces strict sequential nonces.
+Batches with pre-assigned contiguous nonces land fine — Radius's pseudo-mempool accepts and orders them. A single `forge script --broadcast` deploying many contracts confirms all of them in one run (verified: a 29-transaction script landed with contiguous nonces, 29/29 successful). **You do not need to deploy one contract at a time, run `--slow`, or add fixed delays between transactions.**
 
-**Solution: serial queue + nonce retry.**
+The one case that still needs care is firing *unmanaged concurrent* transactions from the same wallet — e.g. a hot/settlement wallet that calls `sendTransaction` from many requests at once without coordinating nonces. As on any EVM chain, those can race and collide because each read of the pending nonce returns the same value before the earlier tx is accounted for.
+
+For that case, let viem manage nonces (it tracks them per account by default), or serialize sends through a queue and retry on the occasional collision:
 
 ```typescript
 function isNonceError(err: any): boolean {
@@ -172,7 +174,7 @@ async function sendWithRetry(
 }
 ```
 
-Also add a ~200ms delay between consecutive transactions. Without it, the RPC sometimes returns stale nonce values.
+This applies only to unmanaged concurrent sends from a single wallet — not to normal sequential sends or pre-signed contiguous-nonce batches, both of which land without special handling.
 
 ---
 
@@ -419,6 +421,15 @@ The Radius mainnet chain ID changed from `723` (`0x2D3`) to `723487` (`0xB0A1F`)
 - **Hardcoded chain IDs:** Any application logic that hardcodes `723`, `0x2D3`, or `"723"` for chain detection or switching must be updated.
 
 Best practice: read chain ID dynamically from the connected provider rather than hardcoding it.
+
+---
+
+## 22. Some standard read methods are unsupported (`eth_getProof`, `eth_getBlockReceipts`)
+
+Two standard Ethereum read methods return error `-33000` on Radius:
+
+- **`eth_getProof`** — Radius stores state across a parallelized, sharded infrastructure with no single global Merkle-Patricia trie, so it does not issue state proofs; its instant, deterministic finality removes the need for them. Read state directly with `eth_getBalance`, `eth_getCode`, and `eth_getStorageAt`.
+- **`eth_getBlockReceipts`** — Radius executes transactions individually, not in blocks (the block number is wall-clock time for tooling compatibility), so "every receipt in a block" is not a meaningful unit. To fetch a block's receipts, enumerate its transactions with `eth_getBlockByNumber` (full) and call `eth_getTransactionReceipt` for each; for event indexing of known contracts, use address-filtered `eth_getLogs` (see #18).
 
 ---
 
