@@ -151,6 +151,8 @@ Always keep these in mind when writing code for Radius:
 | Failed txs | Charge gas even if reverted | Charge only on success |
 | Required token | Must hold ETH for gas | Stablecoins only (USD) |
 | Reorgs | Possible | Impossible |
+| Replace-by-fee (RBF) | Higher-gas resend at same nonce replaces/cancels | Nonce whose tx already executed: rejected (`-33009`). Future nonce still queued: replaceable with higher gas |
+| Returned tx hash | Submitted tx that will eventually mine | "Queued" — a future-nonce tx waits for the gap to fill; poll for the receipt, it's not a mine commitment |
 | `eth_gasPrice` | Market rate | Fixed gas price (~986M wei) |
 | `eth_maxPriorityFeePerGas` | Suggested priority fee | Same as `eth_gasPrice` (no priority fee bidding) |
 | `eth_getBalance` | Native ETH balance | Native + convertible USD balance |
@@ -223,8 +225,10 @@ Always be explicit about:
 Before shipping, review [gotchas.md](references/gotchas.md) for:
 - Wallet compatibility (MetaMask is the only wallet that reliably adds Radius)
 - Nonce management for unmanaged concurrent sends from one wallet (contiguous-nonce batches like `forge script --broadcast` need no special handling)
+- Replace-by-fee applies only to still-queued future-nonce txs (higher gas); fee-bumping a current-nonce tx has no equivalent — rely on instant finality
+- A returned tx hash means "queued," not "will execute" — poll for the receipt and fill nonce gaps
 - Block number is a timestamp (use BigInt, never parseInt)
-- Transaction receipts can be null even for confirmed transactions
+- A single receipt read can briefly lag a just-executed tx — poll, don't single-read
 - EIP-2612 permit domain must match exactly: `{ name: "Stable Coin", version: "1" }`
 
 ### 5. Test

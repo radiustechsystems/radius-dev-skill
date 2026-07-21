@@ -115,20 +115,17 @@ Do not:
 
 ---
 
-## 6. Transaction receipts can be null
+## 6. Transaction receipts can briefly read null
 
-`eth_getTransactionReceipt` can return `null` even for confirmed transactions that appear in the Explorer API. Always handle this:
+`eth_getTransactionReceipt` can return `null` for a transaction RPC call that has returned a tx-hash — a short read-path lag between transaction acceptance and transaction excecution Don't treat a single `null` as failure; poll for the receipt instead of reading once:
 
 ```typescript
-const receipt = await publicClient.getTransactionReceipt({ hash });
-
-if (!receipt) {
-  // Transaction exists but receipt is unavailable
-  // Fetch transaction directly and construct a fallback
-  const tx = await publicClient.getTransaction({ hash });
-  // Handle gracefully — don't crash
-}
+// Poll — the receipt resolves once available, and a returned receipt is final.
+const receipt = await publicClient.waitForTransactionReceipt({ hash });
+if (receipt.status !== 'success') throw new Error('tx reverted');
 ```
+
+A `null` also does not distinguish "not yet served" from "still queued": a future-nonce tx waiting in the pseudo-mempool (see gotcha #7b) reads `null` until the gap fills. In both cases the fix is the same — poll, don't single-read.
 
 ---
 
@@ -175,6 +172,38 @@ async function sendWithRetry(
 ```
 
 This applies only to unmanaged concurrent sends from a single wallet — not to normal sequential sends or pre-signed contiguous-nonce batches, both of which land without special handling.
+
+---
+
+## 7b. Replace-by-fee is queued-txs-only; a returned hash means "queued," not "will execute"
+
+Radius tries to execute every transaction immediately. If a transaction's nonce is higher than the account's current nonce, it can't execute yet, so it enters a bounded "pseudo-mempool" that queues such future-nonce transactions until the gap is filled and they become executable. Two behaviors of this queue differ from Ethereum's mempool and affect ported code.
+
+**Replace-by-fee only applies to still-queued txs.** On most Ethereum nodes, resubmitting at an already-occupied nonce with higher gas replaces the pending tx — the basis for cancel / fee-bump / stuck-tx recovery. On Radius a **used** nonce (one whose tx already executed) is **rejected** — returned as the generic `-33009 Exec Failed` (not an RBF-specific code): with instant finality the tx has already executed, so there is nothing to replace (verified live). RBF *does* work for a tx still **queued** behind an unfilled future nonce — resubmitting at that nonce with a **higher** gas price swaps it in (same or lower gas is rejected; verified live). Exactly one tx per nonce executes, and it executes at the fixed system gas price — the higher gas price only wins the replacement, it is not what you pay. The Ethereum "fee-bump a stuck tx at the current nonce" pattern has no equivalent — current-nonce txs never sit pending.
+
+```typescript
+// WRONG on Radius — "unstick" a tx by resubmitting the same nonce at higher gas.
+// The replacement is rejected; nothing gets unstuck, so recovery logic that waits for it never completes.
+await walletClient.sendTransaction({ ...params, nonce: stuckNonce, gasPrice: gasPrice * 2n });
+```
+
+There is nothing to unstick: gas price is fixed (no underpriced txs) and finality is instant, so a validly submitted tx executes immediately or is rejected at submission — it never sits pending as a fee-bumpable tx. **Remove cancel / fee-bump / stuck-tx recovery when porting; rely on instant finality.**
+
+**A returned tx hash means "queued," not "will execute."** A hash from `eth_sendRawTransaction` for a **future-nonce** tx (submitted while an earlier nonce is unfilled) means only that it was accepted into the queue. It executes when the gap fills — the hash is **not** a commitment that it will mine. If the gap is never filled it never executes (in testing, a queued future-nonce tx stayed queued and executed only once the gap was filled). "Queued" is not a success signal — verify execution by polling for the receipt (`waitForTransactionReceipt`), the check most tools already use. A returned receipt is final. But a single `null` read is not proof the tx failed: a still-queued tx reads `null`, and a just-executed tx's receipt can briefly lag the Explorer (see gotcha #6) — poll, don't single-read.
+
+```typescript
+// WRONG — treating the returned hash as "submitted == will land"
+const hash = await walletClient.sendTransaction(params);
+markPaymentSuccessful(hash); // may be parked behind a nonce gap that never fills
+
+// CORRECT — poll for the receipt; submit in nonce order so gaps fill
+const hash = await walletClient.sendTransaction(params);
+const receipt = await publicClient.waitForTransactionReceipt({ hash });
+if (receipt.status !== 'success') throw new Error('tx reverted');
+// Or use eth_sendRawTransactionSync (EIP-7966) to get the receipt directly.
+```
+
+Send in nonce order and keep each account's in-flight txs low (see gotcha #7) so queued future-nonce txs can execute.
 
 ---
 
