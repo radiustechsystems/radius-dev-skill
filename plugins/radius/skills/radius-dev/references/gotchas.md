@@ -117,7 +117,7 @@ Do not:
 
 ## 6. Transaction receipts can briefly read null
 
-`eth_getTransactionReceipt` can return `null` for a transaction that has already executed — a short read-path lag between execution and the receipt being served. Don't treat a single `null` as failure; poll for the receipt instead of reading once:
+`eth_getTransactionReceipt` can return `null` for a transaction RPC call that has returned a tx-hash — a short read-path lag between transaction acceptance and transaction excecution Don't treat a single `null` as failure; poll for the receipt instead of reading once:
 
 ```typescript
 // Poll — the receipt resolves once available, and a returned receipt is final.
