@@ -30,7 +30,7 @@ Determine the target network **before** doing anything else — it controls the 
    - "mainnet" / "production" / "live" → use **Mainnet**
    - Ambiguous (e.g. "fund my wallet", "get some SBC") → **ask the user** before proceeding.
 
-2. **Default: never silently pick mainnet.** Mainnet drips are rate-limited to 1/day and always require a signature. An accidental mainnet request wastes the user's daily quota and cannot easily be undone. When in doubt, confirm.
+2. **Default: never silently pick mainnet.** Mainnet drips are rate-limited to 1/day and currently require a signature. An accidental mainnet request wastes the user's daily quota and cannot easily be undone. When in doubt, confirm.
 
 | Situation | Network |
 |-----------|---------|
@@ -43,10 +43,10 @@ Determine the target network **before** doing anything else — it controls the 
 
 | Network | URL | Notes |
 |---------|-----|-------|
-| Testnet | `https://testnet.radiustech.xyz/api/v1/faucet` | Signatures not currently required. ~0.5 SBC per drip. 60 requests/min. |
-| Mainnet | `https://network.radiustech.xyz/api/v1/faucet` | Signatures **always** required. ~0.01 SBC per drip. 1 request/day. |
+| Testnet | `https://testnet.radiustech.xyz/api/v1/faucet` | Signatures currently required by server configuration. ~0.5 SBC per drip. 5 requests/min. |
+| Mainnet | `https://network.radiustech.xyz/api/v1/faucet` | Signatures currently required by server configuration. ~0.01 SBC per drip. 1 request/day. |
 
-> **Signatures can be re-enabled on testnet at any time.** Always handle a `signature_required` error from `/drip` by falling back to the signed flow. Never assume unsigned will work permanently.
+> The OpenAPI request schema marks `signature` as optional because signature enforcement is a server-side configuration setting. Live verification on 2026-08-21 showed `signature_required` on both Testnet and Mainnet. Treat signing as required for the currently deployed services, while still handling configuration changes from the API response.
 
 ## Chain Configuration
 
@@ -92,10 +92,10 @@ Before calling the faucet, determine the wallet situation. This decides which fl
 |-----------|:---:|:---:|---|
 | We created or selected a testnet `radius-cli` wallet | ✅ | ✅ | Full `radius-cli` signing flow available |
 | User's wallet, we have key material or an operator-approved signer | ✅ | ✅ | Full flow available |
-| User's wallet, we do NOT have the key — **Testnet** | ✅ | ❌ | Unsigned only — if `signature_required`, ask the user to provide the key or use the [testnet web faucet](https://testnet.radiustech.xyz/wallet) |
-| User's wallet, we do NOT have the key — **Mainnet** | ⚠️ | ❌ | Unsigned will almost certainly fail (`signature_required`). Ask for the key upfront, or direct the user to the [mainnet web faucet](https://network.radiustech.xyz/wallet) before attempting anything. |
+| User's wallet, we do NOT have signing access — **Testnet** | ⚠️ | ❌ | The current deployment returns `signature_required`. Use an operator-approved signer, or use the [testnet web faucet](https://testnet.radiustech.xyz/wallet) |
+| User's wallet, we do NOT have signing access — **Mainnet** | ⚠️ | ❌ | The current deployment returns `signature_required`. Use an operator-approved signer, or direct the user to the [mainnet web faucet](https://network.radiustech.xyz/wallet) before attempting anything. |
 
-**Key rule:** never attempt the signed flow without confirmed signing access through `radius-cli`, app-code key material, or another operator-approved signer. On mainnet, if you only have an address, proactively tell the user that a signature will be required and ask for signing access before making any requests.
+**Key rule:** never attempt the signed flow without confirmed signing access through `radius-cli`, app-code key material, or another operator-approved signer. With the current configuration on either network, an address alone is insufficient. Never ask the user to paste a private key.
 
 ## Flow Overview
 
@@ -105,7 +105,7 @@ Before calling the faucet, determine the wallet situation. This decides which fl
    → signature_required?  →  continue to signed flow
    → rate_limited?  →  wait retry_after_ms, then retry
 
-2. Signed flow (only if step 1 returns signature_required, OR when targeting mainnet and we know a signature is required):
+2. Signed flow (when step 1 returns `signature_required`, as both deployments did during the latest verification):
    a. Check status  →  rate_limited?  →  wait, then retry
    b. Get challenge  →  extract "message" field only
    c. Sign challenge (EIP-191 personal_sign)
@@ -115,9 +115,9 @@ Before calling the faucet, determine the wallet situation. This decides which fl
         → no:  check error code  →  adapt and retry (max 2 retries)
 ```
 
-On testnet today, step 1 succeeds without a signature. But always implement the full flow — signatures can be re-enabled at any time.
+On both deployed services, step 1 currently returns `signature_required`. The unsigned probe is useful for configuration discovery and returns a challenge in `error.details.challenge`; callers may instead fetch `/challenge` directly when signing access is already confirmed.
 
-**On mainnet, step 1 will always return `signature_required`.** If you already know the target network is mainnet and you have the key, you may skip straight to the signed flow to avoid the extra round-trip. If you don't have the key, stop immediately and direct the user to the [mainnet web faucet](https://network.radiustech.xyz/wallet).
+With the current configuration on either network, callers with an approved signer may skip straight to the signed flow to avoid the unsigned probe. If signing access is unavailable, stop and direct the user to the matching web faucet.
 
 ### Agent execution note
 
@@ -183,7 +183,7 @@ const radiusTestnet = defineChain({
 // Option A: We have an existing key (user's wallet, stored in .env)
 // const privateKey = process.env.PRIVATE_KEY as `0x${string}`;
 
-// Option B: We only have an address (no key — unsigned flow only; mainnet will always fail)
+// Option B: We only have an address (no signer — current deployments will reject it)
 // const addressOnly = '0x...' as `0x${string}`;
 
 // Option C: Create a new wallet (we own the key)
@@ -198,7 +198,7 @@ console.log('Wallet address:', account.address);
 // --- Faucet drip with eval loop ---
 async function dripWithRetry(
   address: string,
-  /** Pass null if we don't have the private key — signed fallback will be skipped. */
+  /** Pass null if no operator-approved signer is available. */
   signer: { signMessage: (args: { message: string }) => Promise<string> } | null,
   network: Network = 'testnet',
   maxAttempts = 3
@@ -209,13 +209,13 @@ async function dripWithRetry(
 
   const { faucetUrl, chain } = NETWORK_CONFIG[network];
 
-  // On mainnet, signature is always required. If we have no signer, fail fast
-  // rather than wasting the user's 1-per-day quota on a request that will be rejected.
-  if (network === 'mainnet' && !signer) {
+  // Both deployed faucets currently require a signature. Fail fast when no
+  // approved signer is available rather than making a request known to fail.
+  if (!signer) {
     return {
       success: false,
       network,
-      error: 'mainnet_signature_required_but_no_key',
+      error: 'signature_required_but_no_signer',
     };
   }
 
@@ -230,13 +230,17 @@ async function dripWithRetry(
     });
     let drip = await dripRes.json();
 
+    // Error responses currently use { error: { code, message, ... } }.
+    let errorCode = typeof drip.error === 'string' ? drip.error : drip.error?.code;
+    let errorMessage = typeof drip.error === 'string' ? drip.message : drip.error?.message;
+
     // 2. If signature required, fall back to signed flow (only if we have a signer)
-    if (drip.error === 'signature_required') {
+    if (errorCode === 'signature_required') {
       if (!signer) {
         return {
           success: false,
           network,
-          error: 'signature_required_but_no_key',
+          error: 'signature_required_but_no_signer',
         };
       }
       console.log('Signature required — switching to signed flow');
@@ -270,6 +274,8 @@ async function dripWithRetry(
         body: JSON.stringify({ address, token: 'SBC', signature }),
       });
       drip = await signedRes.json();
+      errorCode = typeof drip.error === 'string' ? drip.error : drip.error?.code;
+      errorMessage = typeof drip.error === 'string' ? drip.message : drip.error?.message;
     }
 
     // 3. Evaluate
@@ -288,10 +294,10 @@ async function dripWithRetry(
     }
 
     // Critique: map error to action
-    console.error(`Attempt ${attempt} failed: ${drip.error} — ${drip.message ?? ''}`);
+    console.error(`Attempt ${attempt} failed: ${errorCode} — ${errorMessage ?? ''}`);
 
-    if (drip.error === 'rate_limited') {
-      const waitMs = drip.retry_after_ms ?? 60_000;
+    if (errorCode === 'rate_limited') {
+      const waitMs = drip.error?.retry_after_ms ?? drip.retry_after_ms ?? 60_000;
       // On mainnet, a rate_limited response means ~24h. Stop immediately.
       if (waitMs > 3_600_000) {
         return { success: false, network, error: `rate_limited_long_wait_ms:${waitMs}` };
@@ -299,31 +305,31 @@ async function dripWithRetry(
       await new Promise((r) => setTimeout(r, waitMs));
       continue;
     }
-    if (drip.error === 'invalid_signature') {
+    if (errorCode === 'invalid_signature') {
       // Re-fetch challenge in case it rotated
       continue;
     }
-    if (['faucet_empty', 'sbc_not_configured', 'internal_error'].includes(drip.error)) {
-      return { success: false, network, error: drip.error };
+    if (['faucet_empty', 'sbc_not_configured', 'internal_error'].includes(errorCode)) {
+      return { success: false, network, error: errorCode };
     }
   }
 
   return { success: false, network, error: 'max_attempts_exceeded' };
 }
 
-// Testnet — create a throwaway wallet, no signature needed today
+// Testnet — create a throwaway wallet and sign the configured challenge
 const testnetResult = await dripWithRetry(account.address, account, 'testnet');
 console.log('Testnet result:', JSON.stringify(testnetResult, null, 2));
 
-// Mainnet — use an existing wallet whose key is available; signature always required
+// Mainnet — use an existing wallet with an approved signer; signature currently required
 // const mainnetAccount = privateKeyToAccount(process.env.PRIVATE_KEY as `0x${string}`);
 // const mainnetResult = await dripWithRetry(mainnetAccount.address, mainnetAccount, 'mainnet');
 // console.log('Mainnet result:', JSON.stringify(mainnetResult, null, 2));
 
-// If you only have an address and no key on testnet (unsigned-only):
+// If you only have an address and no signer on testnet (unsigned-only):
 // dripWithRetry(addressOnly, null, 'testnet');
-// NOTE: dripWithRetry(addressOnly, null, 'mainnet') will return immediately with
-// mainnet_signature_required_but_no_key — mainnet always requires a signature.
+// NOTE: the currently deployed services require a signature, so address-only
+// calls return immediately with signature_required_but_no_signer.
 ```
 
 ## Agent-created wallet
@@ -372,13 +378,13 @@ ADDRESS="${OWNER:-$(radius-cli wallet address)}"
 echo "Wallet ($NETWORK): $ADDRESS"
 
 # 1. Try unsigned drip first
-#    On mainnet this will return signature_required immediately — that is expected.
+#    Both current deployments return signature_required immediately — that is expected.
 DRIP=$(curl -s -X POST "$FAUCET_URL/drip" \
   -H "Content-Type: application/json" \
   -d "{\"address\": \"$ADDRESS\", \"token\": \"SBC\"}")
 echo "Drip response: $DRIP"
 
-ERROR=$(echo "$DRIP" | jq -r '.error // empty')
+ERROR=$(echo "$DRIP" | jq -r 'if (.error | type) == "object" then .error.code else .error // empty end')
 
 # 2. If signature required, fall back to signed flow
 if [ "$ERROR" = "signature_required" ]; then
@@ -414,7 +420,7 @@ fi
 # 3. Evaluate
 SUCCESS=$(echo "$DRIP" | jq -r '.success')
 if [ "$SUCCESS" != "true" ]; then
-  echo "Drip failed: $(echo "$DRIP" | jq -r '.error') — $(echo "$DRIP" | jq -r '.message // empty')"
+  echo "Drip failed: $(echo "$DRIP" | jq -r 'if (.error | type) == "object" then .error.code else .error end') — $(echo "$DRIP" | jq -r 'if (.error | type) == "object" then .error.message else .message // empty end')"
   exit 1
 fi
 echo "TX hash: $(echo "$DRIP" | jq -r '.tx_hash')"
@@ -424,12 +430,12 @@ BALANCE=$(radius-cli wallet balance --json)
 echo "Balance ($NETWORK): $BALANCE"
 ```
 
-## Bash Example (address-only — we do NOT own the wallet)
+## Bash Example (address-only — no signing access)
 
-If you only have an address and no private key, you can only use the unsigned flow.
+If you only have an address and no approved signer, you can only probe the unsigned flow. Both deployments currently reject it with `signature_required`.
 
-- On **testnet**: if the faucet requires a signature, stop and tell the user.
-- On **mainnet**: the faucet **always** requires a signature. Do not even attempt this flow on mainnet — direct the user to the web faucet immediately.
+- On **testnet**: the current deployment requires a signature, so stop and tell the user or direct them to the web faucet.
+- On **mainnet**: the current deployment requires a signature. Do not attempt an address-only flow; direct the user to the web faucet immediately.
 
 ```bash
 #!/usr/bin/env bash
@@ -440,7 +446,7 @@ NETWORK="${NETWORK:-testnet}"
 
 if [ "$NETWORK" = "mainnet" ]; then
   echo "ERROR: address-only (unsigned) flow cannot be used on mainnet."
-  echo "Mainnet always requires a signature. Provide the private key/keystore, or use:"
+  echo "The current mainnet faucet configuration requires a signature. Use an approved signer, or visit:"
   echo "  https://network.radiustech.xyz/wallet"
   exit 1
 fi
@@ -450,25 +456,25 @@ SBC_CONTRACT="0x33ad9e4BD16B69B5BFdED37D8B5D9fF9aba014Fb"
 RPC_URL="https://rpc.testnet.radiustech.xyz"
 ADDRESS="${1:?Usage: $0 <address>}"
 
-echo "Funding (unsigned only, testnet): $ADDRESS"
+echo "Probing faucet configuration (unsigned only, testnet): $ADDRESS"
 
-# Unsigned drip — the only option without a key
+# Unsigned probe — the only option without an approved signer
 DRIP=$(curl -s -X POST "$FAUCET_URL/drip" \
   -H "Content-Type: application/json" \
   -d "{\"address\": \"$ADDRESS\", \"token\": \"SBC\"}")
 echo "Drip response: $DRIP"
 
-ERROR=$(echo "$DRIP" | jq -r '.error // empty')
+ERROR=$(echo "$DRIP" | jq -r 'if (.error | type) == "object" then .error.code else .error // empty end')
 
 if [ "$ERROR" = "signature_required" ]; then
-  echo "ERROR: Faucet requires a signature but we don't have the private key for $ADDRESS."
-  echo "Ask the user to provide the key/keystore, or use the web faucet: https://testnet.radiustech.xyz/wallet"
+  echo "ERROR: Faucet requires a signature but no approved signer is available for $ADDRESS."
+  echo "Use the web faucet instead: https://testnet.radiustech.xyz/wallet"
   exit 1
 fi
 
 SUCCESS=$(echo "$DRIP" | jq -r '.success')
 if [ "$SUCCESS" != "true" ]; then
-  echo "Drip failed: $(echo "$DRIP" | jq -r '.error') — $(echo "$DRIP" | jq -r '.message // empty')"
+  echo "Drip failed: $(echo "$DRIP" | jq -r 'if (.error | type) == "object" then .error.code else .error end') — $(echo "$DRIP" | jq -r 'if (.error | type) == "object" then .error.message else .message // empty end')"
   exit 1
 fi
 echo "TX hash: $(echo "$DRIP" | jq -r '.tx_hash')"
@@ -500,10 +506,10 @@ These mistakes are easy to make and have been observed in practice:
 | Silent curl | `curl -sf` captures to variable but agent sees `(No output)` | `curl -s` + `echo "Response: $VAR"` on the next line |
 | Using Foundry as the agent wallet surface | `cast wallet new` / `cast wallet sign` for a fresh agent demo | Use `RADIUS_HOME=.radius radius-cli wallet address` and `radius-cli wallet sign` |
 | Mixing wallet scopes | Reusing one global wallet across unrelated agent demos | Set a distinct `RADIUS_HOME` per project or agent |
-| Assuming signing access from an address | Treating `0x...` as enough for mainnet signed flow | Confirm `radius-cli` or another signer can sign for the address before calling the faucet |
+| Assuming signing access from an address | Treating `0x...` as enough for the currently configured signed flow | Confirm `radius-cli` or another approved signer can sign for the address before calling either faucet |
 | Variables across shells | Setting `FAUCET_URL=...` in one agent bash call, using `$FAUCET_URL` in the next → empty | Run the entire flow in one command, or inline all values |
 | Wrong network after copy-paste | Copying a testnet example without updating `FAUCET_URL` / `RPC_URL` → drip hits testnet faucet but on-chain check queries testnet RPC; mainnet balance stays 0 | Always set both `FAUCET_URL` **and** `RPC_URL` from the same `NETWORK` variable |
-| Unsigned flow on mainnet | Sending a `/drip` request without a signature to the mainnet faucet and waiting for it to succeed | Mainnet **always** returns `signature_required`. Either go straight to the signed flow, or fail fast if you don't have the key |
+| Treating OpenAPI optionality as deployed behavior | Assuming an optional `signature` schema field means unsigned drips are accepted | Signature enforcement is configuration-driven; both services returned `signature_required` in live verification on 2026-08-21 |
 | Retrying after mainnet rate limit | Looping on a `rate_limited` error from mainnet with the same wait-and-retry logic used on testnet | Mainnet `retry_after_ms` is ~86 400 000 ms (24 hours). Stop immediately, report the wait time to the user, and do not retry in-process |
 | Using testnet chain for mainnet on-chain check | Hardcoding `chain: radiusTestnet` in `createPublicClient` regardless of network → `balanceOf` query goes to the wrong chain, always returns 0 | Derive the chain from the `network` parameter; use `NETWORK_CONFIG[network].chain` |
 | Creating a wallet you'll forget about | Generating a fresh mainnet wallet in an unclear scope | Mainnet tokens have real value — set `RADIUS_HOME` intentionally and record which project owns it |
@@ -523,7 +529,7 @@ When an agent executes this skill, it should follow the evaluator-optimizer patt
 |-------|-----------|--------------|
 | `rate_limited` (testnet) | Too many requests from this address | Wait `retry_after_ms`, then retry |
 | `rate_limited` (mainnet) | Daily quota exhausted | Stop. Report to user. Retry tomorrow. Do not loop. |
-| `signature_required` | Faucet has signatures enabled (always on mainnet) | Fall back to signed flow — but **only if we have the private key**. If not, stop and tell the user. |
+| `signature_required` | Faucet has signature enforcement enabled (currently both networks) | Fall back to signed flow — but **only with an operator-approved signer**. If none is available, stop and tell the user. |
 | `invalid_signature` | Wrong key or stale challenge | Re-fetch challenge, re-sign, retry |
 | `faucet_empty` | Faucet wallet is drained | Stop. Report to user. Retry later. |
 | `sbc_not_configured` | Server misconfiguration | Stop. Report to user. |

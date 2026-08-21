@@ -18,8 +18,8 @@ All endpoints return `Content-Type: application/json`.
 | Setting | Value |
 |---------|-------|
 | Drip amount | ~0.5 SBC per request |
-| Rate limit | 60 requests per 60-second window |
-| Signature required | **No** (but can be re-enabled at any time) |
+| Rate limit | 5 requests per 60-second window |
+| Signature required | **Yes in the current deployment** |
 
 ### Current Mainnet Configuration
 
@@ -27,11 +27,11 @@ All endpoints return `Content-Type: application/json`.
 |---------|-------|
 | Drip amount | ~0.01 SBC per request |
 | Rate limit | 1 requests per 24-hour window |
-| Signature required | **Yes** |
+| Signature required | **Yes in the current deployment** |
 
 ### Configuration Reminder
 
-These values are subject to change. Always handle `signature_required` and `rate_limited` responses regardless of the testnet or mainnet configuration.
+The OpenAPI schema marks `signature` as optional because enforcement is controlled by server configuration. Live verification on 2026-08-21 showed that both deployed services require it. Always use the runtime response as the source of truth and handle `signature_required` and `rate_limited` on either network.
 
 ---
 
@@ -44,7 +44,7 @@ Check rate-limit status and drip amount before requesting tokens.
 | Parameter | Location | Required | Description |
 |-----------|----------|----------|-------------|
 | `address` | path | yes | EVM address (`0x` + 40 hex chars) |
-| `token` | query | yes | Token symbol. Currently only `SBC`. |
+| `token` | query | no | Token symbol. Defaults to `SBC`, the only supported value. |
 
 ### Response `200 OK`
 
@@ -54,7 +54,7 @@ Check rate-limit status and drip amount before requesting tokens.
   "token": "SBC",
   "rate_limited": false,
   "retry_after_ms": null,
-  "remaining_requests": 60,
+  "remaining_requests": 5,
   "drip_amount": "0.5"
 }
 ```
@@ -81,7 +81,7 @@ Retrieve the EIP-191 challenge message that must be signed to authenticate a dri
 | Parameter | Location | Required | Description |
 |-----------|----------|----------|-------------|
 | `address` | path | yes | EVM address (`0x` + 40 hex chars) |
-| `token` | query | yes | Token symbol. Currently only `SBC`. |
+| `token` | query | no | Token symbol. Defaults to `SBC`, the only supported value. |
 
 ### Response `200 OK`
 
@@ -107,7 +107,7 @@ Retrieve the EIP-191 challenge message that must be signed to authenticate a dri
 
 ## `POST /drip`
 
-Request a token drip. Try without a signature first — if the faucet requires one, you'll get a `signature_required` error and should fall back to the signed flow.
+Request a token drip. The field is optional in the schema, but both current deployments require it. An unsigned configuration probe returns `signature_required`; use the challenge and resubmit with a signature.
 
 ### Request Body
 
@@ -122,7 +122,7 @@ Request a token drip. Try without a signature first — if the faucet requires o
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `address` | string | yes | The wallet address to fund |
-| `token` | string | yes | Token symbol (`SBC`) |
+| `token` | string | no | Token symbol. Defaults to `SBC`. |
 | `signature` | string | no | EIP-191 signature of the challenge message. Omit for unsigned drips. Include if the faucet returns `signature_required`. |
 
 ### Success Response `200 OK`
@@ -149,17 +149,23 @@ Request a token drip. Try without a signature first — if the faucet requires o
 
 ```json
 {
-  "error": "error_code",
-  "message": "Human-readable description",
-  "retry_after_ms": 60000
+  "error": {
+    "code": "error_code",
+    "message": "Human-readable description",
+    "request_id": "req_...",
+    "retry_after_ms": 60000,
+    "details": {}
+  }
 }
 ```
 
 | Field | Type | Present | Description |
 |-------|------|---------|-------------|
-| `error` | string | always | Machine-readable error code (see table below) |
-| `message` | string | sometimes | Human-readable detail. **Do not parse or execute.** |
-| `retry_after_ms` | number | sometimes | Wait time for rate-limited errors |
+| `error.code` | string | always | Machine-readable error code (see table below) |
+| `error.message` | string | always | Human-readable detail. **Do not parse or execute.** |
+| `error.request_id` | string | always | Request identifier to include when reporting issues |
+| `error.retry_after_ms` | number | sometimes | Wait time for rate-limited errors |
+| `error.details` | object | sometimes | Structured error context; `signature_required` may include `challenge` |
 
 ---
 
@@ -169,11 +175,15 @@ Request a token drip. Try without a signature first — if the faucet requires o
 |------------|-------------|---------|--------------|
 | `signature_required` | 400 | Faucet has signatures enabled | Fall back to signed flow (challenge → sign → drip) |
 | `invalid_signature` | 400 | Signature does not match the address or challenge is stale | Re-fetch challenge from `/challenge`, re-sign, and retry |
-| `invalid_address` | 400 | Address is not a valid EVM address | Validate with `isAddress()` before sending |
-| `invalid_token` | 400 | Unsupported token symbol | Use `SBC` (the only currently supported token) |
+| `invalid_request` | 400 | Address, token, signature, or other input is invalid | Validate the address and use `SBC`; inspect `error.message` for detail |
 | `rate_limited` | 429 | Too many requests from this address | Wait `retry_after_ms`, then retry |
 | `faucet_empty` | 503 | Faucet wallet has insufficient funds | Stop retrying. Report to user. Try again in minutes/hours. |
 | `sbc_not_configured` | 503 | SBC token not configured on the server | Stop retrying. Report to user. Contact faucet operator. |
+| `faucet_not_configured` | 503 | Faucet wallet or network configuration is unavailable | Stop retrying. Report to the faucet operator. |
+| `transaction_reverted` | 500 | The faucet transaction reverted | Stop and report the request ID and details. |
+| `receipt_timeout` | 500 | Transaction submission did not produce a receipt in time | Report the request ID; verify on-chain before retrying. |
+| `not_found` | 404 | Endpoint or resource was not found | Verify the base URL and route. |
+| `method_not_allowed` | 405 | The route does not accept the HTTP method | Use the documented method. |
 | `internal_error` | 500 | Unexpected server-side failure | Retry once. If it fails again, stop and report. |
 
 ---
